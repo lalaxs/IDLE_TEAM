@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 塞拉 · 冰法：霜冠 + 冰杖 -->
+  <g stroke="#33404a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="64" cy="111" rx="28" ry="7" fill="#4e6c7e" opacity=".2" stroke="none"/>
+    <path d="M53 72l-9 39h42l-9-39" fill="#76a9c7"/>
+    <path d="M50 78h28" stroke="#d6f2ff" stroke-width="3.5"/>
+    <path d="M56 90h16" stroke="#5e91b0" stroke-width="4"/>
+    <circle cx="64" cy="48" r="32" fill="#e4c5a2"/>
+    <path d="M40 28l10 6 8-12 8 12 12-8-2 12H38z" fill="#b9d7e5"/>
+    <path d="M64 12l5 4-5 4-3-4z" fill="#d6f2ff" stroke-width="3"/>
+    <path d="M50 18l4 3-4 3-2-3z" fill="#d6f2ff" stroke-width="3"/>
+    <path d="M78 18l4 3-4 3-2-3z" fill="#d6f2ff" stroke-width="3"/>
+    <ellipse cx="55" cy="50" rx="4" ry="6" fill="#263039" stroke="none"/>
+    <ellipse cx="77" cy="49" rx="4" ry="6" fill="#263039" stroke="none"/>
+    <path d="M45 84l-16 15M82 83l17 15" fill="none"/>
+    <path d="M50 108l-7 10M78 108l7 10" fill="none"/>
+    <path d="M98 106l9-32" fill="none" stroke="#5f7180" stroke-width="6"/>
+    <path d="M109 66v16M101 70l16 8M101 78l16-8" stroke="#d6f2ff" stroke-width="3.5"/>
+  </g>
+</svg>

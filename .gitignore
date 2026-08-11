@@ -1,0 +1,13 @@
+node_modules/
+dist/
+artifacts/
+test-results/
+playwright-report/
+.DS_Store
+*.tgz
+__pycache__/
+*.pyc
+.worktrees/
+.superpowers/
+idle/
+*.pid

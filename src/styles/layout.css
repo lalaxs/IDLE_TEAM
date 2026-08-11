@@ -1,0 +1,179 @@
+body {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  overscroll-behavior: none;
+}
+
+.fit-stage {
+  width: 100%;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+}
+
+.fit-stage__slot {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100dvh;
+}
+
+.fit-stage--scaled {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.fit-stage--scaled .fit-stage__slot {
+  max-width: none;
+  min-height: 0;
+}
+
+.fit-stage--scaled #app {
+  max-width: none;
+  min-height: 0;
+  transform-origin: top left;
+}
+
+#app {
+  width: 100%;
+  max-width: 430px;
+  height: 100dvh;
+  min-height: 100dvh;
+}
+
+.game-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background: var(--cream);
+  overflow: hidden;
+  container-type: size;
+  display: grid;
+  grid-template-rows:
+    calc(54px + env(safe-area-inset-top))
+    clamp(228px, 35cqh, 308px)
+    68px
+    minmax(0, 1fr)
+    calc(66px + env(safe-area-inset-bottom));
+}
+
+.game-shell > .topbar { grid-row: 1; }
+.game-shell > .battle-frame { grid-row: 2; }
+.game-shell > .party-strip { grid-row: 3; }
+.game-shell > .alchemy-tips-host {
+  /* Anchor to party-strip row so height matches real layout (avoids cqh calc drift). */
+  grid-column: 1;
+  grid-row: 3;
+  z-index: 14;
+  position: relative;
+  align-self: end;
+  justify-self: stretch;
+  width: 100%;
+  height: calc(100% + 72px);
+  margin-top: -60px;
+  margin-bottom: -12px;
+  pointer-events: none;
+}
+
+.game-shell > .alchemy-tips-host:empty {
+  display: none;
+}
+.game-shell > .content-panel { grid-row: 4; }
+.game-shell > .bottom-nav { grid-row: 5; }
+.game-shell > .overlay-layer {
+  grid-area: 1 / 1 / -1 / -1;
+}
+
+#battle-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#battle-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#dom-ui {
+  display: contents;
+}
+
+.topbar,
+.party-strip,
+.content-panel,
+.bottom-nav {
+  position: relative;
+  z-index: 3;
+}
+
+.battle-frame {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.boot-screen {
+  min-height: 100%;
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  background: linear-gradient(#aac8c2, #d9e4c3 58%, #879c6f);
+  color: #fffaf0;
+  text-shadow: 0 2px 0 #4a5b4c;
+}
+
+.boot-emblem {
+  font-size: 54px;
+}
+
+@supports not (height: 100dvh) {
+  body,
+  .fit-stage,
+  .fit-stage__slot,
+  #app {
+    min-height: 100vh;
+  }
+
+  #app {
+    height: 100vh;
+  }
+
+  .fit-stage--scaled {
+    height: 100vh;
+    min-height: 100vh;
+  }
+}
+
+@supports not (container-type: size) {
+  .game-shell {
+    grid-template-rows:
+      calc(54px + env(safe-area-inset-top))
+      clamp(228px, 35%, 308px)
+      68px
+      minmax(0, 1fr)
+      calc(66px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .game-shell::after {
+    content: "请旋转设备，以竖屏体验青丘远征";
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    display: grid;
+    place-items: center;
+    padding: 32px;
+    background: #27362f;
+    color: #fff;
+    text-align: center;
+    font-size: 18px;
+  }
+}

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 海泽 · 萨满：羽环 + 雷杖 -->
+  <g stroke="#3a302b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="64" cy="111" rx="28" ry="7" fill="#63506c" opacity=".2" stroke="none"/>
+    <path d="M53 72l-9 39h42l-9-39" fill="#8f6b98"/>
+    <path d="M48 76h32" stroke="#604e45" stroke-width="5"/>
+    <circle cx="64" cy="92" r="7" fill="#edcd58" stroke-width="3.5"/>
+    <path d="M64 88v8M60 92h8" stroke-width="2.5"/>
+    <circle cx="64" cy="48" r="32" fill="#bb805e"/>
+    <path d="M38 34h52" stroke="#604e45" stroke-width="6"/>
+    <path d="M86 16q10-6 12 8-8 2-14 0z" fill="#8fc9d8"/>
+    <path d="M42 20q-8-6-10 6 6 2 12 0z" fill="#edcd58"/>
+    <ellipse cx="55" cy="50" rx="4" ry="6" fill="#26221f" stroke="none"/>
+    <ellipse cx="77" cy="49" rx="4" ry="6" fill="#26221f" stroke="none"/>
+    <path d="M45 84l-16 15M82 83l17 15" fill="none"/>
+    <path d="M50 108l-7 10M78 108l7 10" fill="none"/>
+    <path d="M98 106l9-32" fill="none" stroke="#6e5138" stroke-width="7"/>
+    <path d="M105 68l8 7-7 7-7-7z" fill="#edcd58"/>
+    <path d="M96 82h18" stroke="#8fc9d8" stroke-width="3"/>
+  </g>
+</svg>

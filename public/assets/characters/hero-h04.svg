@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 诺拉 · 牧师：圣环 + 十字杖 -->
+  <g stroke="#3a302b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="64" cy="111" rx="28" ry="7" fill="#6e6548" opacity=".18" stroke="none"/>
+    <path d="M53 72l-9 39h42l-9-39" fill="#eee0ad"/>
+    <path d="M50 76h28" stroke="#f4da6b" stroke-width="4"/>
+    <circle cx="64" cy="90" r="6" fill="#f4da6b" stroke-width="3.5"/>
+    <path d="M64 86v8M60 90h8" stroke-width="2.5"/>
+    <circle cx="64" cy="48" r="32" fill="#edc899"/>
+    <circle cx="64" cy="20" r="11" fill="none" stroke="#f4da6b" stroke-width="5"/>
+    <path d="M64 14v12M58 20h12" stroke="#f4da6b" stroke-width="3.5"/>
+    <ellipse cx="55" cy="50" rx="4" ry="6" fill="#2d2824" stroke="none"/>
+    <ellipse cx="77" cy="49" rx="4" ry="6" fill="#2d2824" stroke="none"/>
+    <path d="M45 84l-16 15M82 83l17 15" fill="none"/>
+    <path d="M50 108l-7 10M78 108l7 10" fill="none"/>
+    <path d="M98 106l9-32" fill="none" stroke="#846947" stroke-width="6"/>
+    <circle cx="109" cy="70" r="9" fill="#f4da6b"/>
+    <path d="M109 64v12M103 70h12" stroke-width="3"/>
+  </g>
+</svg>

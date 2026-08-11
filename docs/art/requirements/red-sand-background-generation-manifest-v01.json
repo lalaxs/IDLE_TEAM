@@ -1,0 +1,154 @@
+{
+  "review": {
+    "title": "RED SAND ANCIENT ROAD / 12 STAGES + CHAPTER MAP",
+    "regions": [
+      {
+        "id": "red_dunes",
+        "title": "RED DUNES / 3-1 — 3-4",
+        "filename": "red_dunes_contact_sheet_v01.jpg"
+      },
+      {
+        "id": "wind_canyon",
+        "title": "WIND CANYON / 3-5 — 3-8",
+        "filename": "wind_canyon_contact_sheet_v01.jpg"
+      },
+      {
+        "id": "sunken_city",
+        "title": "SUNKEN CITY / 3-9 — 3-12",
+        "filename": "sunken_city_contact_sheet_v01.jpg"
+      }
+    ]
+  },
+  "entries": [
+    {
+      "id": "BG-03-01",
+      "stage": "3-1",
+      "region": "red_dunes",
+      "name": "赤沙驿道",
+      "filename": "bg_stage_03_01_red_sand_road_v01.png",
+      "landmarks": ["低矮圆沙丘", "无文字石路桩", "耐旱草"],
+      "reference_id": null,
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-02",
+      "stage": "3-2",
+      "region": "red_dunes",
+      "name": "盐壳浅滩",
+      "filename": "bg_stage_03_02_salt_crust_shallows_v01.png",
+      "landmarks": ["浅色盐壳洼地", "圆润赭石", "干涸水痕"],
+      "reference_id": "BG-03-01",
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-03",
+      "stage": "3-3",
+      "region": "red_dunes",
+      "name": "风刻沙坡",
+      "filename": "bg_stage_03_03_wind_carved_slope_v01.png",
+      "landmarks": ["层叠圆沙坡", "外露陶土岩层", "低伏灌木"],
+      "reference_id": "BG-03-01",
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-04",
+      "stage": "3-4",
+      "region": "red_dunes",
+      "name": "断轮商道",
+      "filename": "bg_stage_03_04_broken_wheel_trade_road_v01.png",
+      "landmarks": ["断裂木轮", "短车轴", "半埋货箱"],
+      "reference_id": "BG-03-01",
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-05",
+      "stage": "3-5",
+      "region": "wind_canyon",
+      "name": "峡口石门",
+      "filename": "bg_stage_03_05_canyon_stone_gate_v01.png",
+      "landmarks": ["圆钝砂岩柱", "开放中央石门", "灰绿灌木"],
+      "reference_id": null,
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-06",
+      "stage": "3-6",
+      "region": "wind_canyon",
+      "name": "回声旱谷",
+      "filename": "bg_stage_03_06_echo_dry_valley_v01.png",
+      "landmarks": ["干涸溪床", "光滑圆石", "浅色泥裂"],
+      "reference_id": "BG-03-05",
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-07",
+      "stage": "3-7",
+      "region": "wind_canyon",
+      "name": "盘岩小径",
+      "filename": "bg_stage_03_07_coiled_rock_path_v01.png",
+      "landmarks": ["卷曲层岩", "抬高岩台", "耐旱矮灌木"],
+      "reference_id": "BG-03-05",
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-08",
+      "stage": "3-8",
+      "region": "wind_canyon",
+      "name": "遮阳营地",
+      "filename": "bg_stage_03_08_shade_camp_v01.png",
+      "landmarks": ["外侧破旧布棚", "无文字陶罐", "熄灭火盆"],
+      "reference_id": "BG-03-05",
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-09",
+      "stage": "3-9",
+      "region": "sunken_city",
+      "name": "沉沙外城",
+      "filename": "bg_stage_03_09_sunken_outer_city_v01.png",
+      "landmarks": ["半埋无字城墙", "残缺圆拱", "砂岩碎块"],
+      "reference_id": null,
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-10",
+      "stage": "3-10",
+      "region": "sunken_city",
+      "name": "铜门集市",
+      "filename": "bg_stage_03_10_copper_gate_market_v01.png",
+      "landmarks": ["氧化铜门板", "空白布棚", "收起摊台"],
+      "reference_id": "BG-03-09",
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-11",
+      "stage": "3-11",
+      "region": "sunken_city",
+      "name": "巨柱门廊",
+      "filename": "bg_stage_03_11_giant_pillar_portico_v01.png",
+      "landmarks": ["高大圆角砂岩柱", "断裂横梁", "开放中央通路"],
+      "reference_id": "BG-03-09",
+      "status": "approved"
+    },
+    {
+      "id": "BG-03-12",
+      "stage": "3-12",
+      "region": "sunken_city",
+      "name": "赤砂王庭",
+      "filename": "bg_stage_03_12_red_sand_court_v01.png",
+      "landmarks": ["半埋王庭", "两侧肩墙", "克制青铜日辉"],
+      "reference_id": "BG-03-09",
+      "status": "approved"
+    },
+    {
+      "id": "BG-MAP-03",
+      "stage": null,
+      "region": "chapter",
+      "name": "赤沙古道",
+      "filename": "bg_chapter_03_red_sand_ancient_road_map_v01.png",
+      "landmarks": ["左侧赤沙驿道", "中部风蚀峡谷", "右侧沉沙古城", "浅赭色蜿蜒道路"],
+      "reference_id": null,
+      "status": "approved"
+    }
+  ]
+}

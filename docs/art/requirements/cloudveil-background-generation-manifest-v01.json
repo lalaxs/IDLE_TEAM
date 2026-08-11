@@ -1,0 +1,25 @@
+{
+  "review": {
+    "title": "CLOUDVEIL SKYREALM / 12 STAGES + CHAPTER MAP",
+    "regions": [
+      {"id": "cloud_highlands", "title": "CLOUD HIGHLANDS / 4-1 — 4-4", "filename": "cloud_highlands_contact_sheet_v01.jpg"},
+      {"id": "floating_valley", "title": "FLOATING VALLEY / 4-5 — 4-8", "filename": "floating_valley_contact_sheet_v01.jpg"},
+      {"id": "sky_city", "title": "SKY CITY / 4-9 — 4-12", "filename": "sky_city_contact_sheet_v01.jpg"}
+    ]
+  },
+  "entries": [
+    {"id": "BG-04-01", "stage": "4-1", "region": "cloud_highlands", "name": "云岚驿道", "filename": "bg_stage_04_01_cloudveil_road_v01.png", "landmarks": ["低矮白岩", "无文字叠石路标", "灰薄荷风草"], "reference_id": null, "status": "approved"},
+    {"id": "BG-04-02", "stage": "4-2", "region": "cloud_highlands", "name": "风铃草坡", "filename": "bg_stage_04_02_bellflower_slope_v01.png", "landmarks": ["淡紫风铃草", "低缓坡地", "远处云海"], "reference_id": "BG-04-01", "status": "approved"},
+    {"id": "BG-04-03", "stage": "4-3", "region": "cloud_highlands", "name": "白岩梯田", "filename": "bg_stage_04_03_white_rock_terraces_v01.png", "landmarks": ["暖白石灰岩台地", "浅灰蓝集水洼", "短草簇"], "reference_id": "BG-04-01", "status": "approved"},
+    {"id": "BG-04-04", "stage": "4-4", "region": "cloud_highlands", "name": "断索云桥", "filename": "bg_stage_04_04_broken_rope_cloud_bridge_v01.png", "landmarks": ["旧石桥头", "断裂粗绳", "低矮护栏"], "reference_id": "BG-04-01", "status": "approved"},
+    {"id": "BG-04-05", "stage": "4-5", "region": "floating_valley", "name": "浮石谷口", "filename": "bg_stage_04_05_floating_stone_gate_v01.png", "landmarks": ["圆钝灰紫岩柱", "远处三块浮石", "开放中央"], "reference_id": null, "status": "approved"},
+    {"id": "BG-04-06", "stage": "4-6", "region": "floating_valley", "name": "回风石径", "filename": "bg_stage_04_06_returning_wind_path_v01.png", "landmarks": ["弧形层岩", "低矮云流", "鼠尾草灌木"], "reference_id": "BG-04-05", "status": "approved"},
+    {"id": "BG-04-07", "stage": "4-7", "region": "floating_valley", "name": "悬根栈道", "filename": "bg_stage_04_07_hanging_root_boardwalk_v01.png", "landmarks": ["两侧粗根", "短木栈道端部", "灰紫岩台"], "reference_id": "BG-04-05", "status": "approved"},
+    {"id": "BG-04-08", "stage": "4-8", "region": "floating_valley", "name": "云帆营地", "filename": "bg_stage_04_08_cloud_sail_camp_v01.png", "landmarks": ["收起无字云帆", "空白陶罐", "熄灭风灯"], "reference_id": "BG-04-05", "status": "approved"},
+    {"id": "BG-04-09", "stage": "4-9", "region": "sky_city", "name": "云门外庭", "filename": "bg_stage_04_09_cloud_gate_outer_court_v01.png", "landmarks": ["半埋暖白城墙", "空白圆拱", "低矮石块"], "reference_id": null, "status": "approved"},
+    {"id": "BG-04-10", "stage": "4-10", "region": "sky_city", "name": "青铜风廊", "filename": "bg_stage_04_10_bronze_wind_gallery_v01.png", "landmarks": ["暗青铜绿百叶", "无字布棚", "收起长凳"], "reference_id": "BG-04-09", "status": "approved"},
+    {"id": "BG-04-11", "stage": "4-11", "region": "sky_city", "name": "高塔门廊", "filename": "bg_stage_04_11_high_tower_portico_v01.png", "landmarks": ["圆角白石塔柱", "断裂侧梁", "开放中央"], "reference_id": "BG-04-09", "status": "approved"},
+    {"id": "BG-04-12", "stage": "4-12", "region": "sky_city", "name": "云冠天城", "filename": "bg_stage_04_12_cloudcrown_city_v01.png", "landmarks": ["层叠天城", "两侧肩墙", "克制旧金屋顶"], "reference_id": "BG-04-09", "status": "approved"},
+    {"id": "BG-MAP-04", "stage": null, "region": "chapter", "name": "云岚天境", "filename": "bg_chapter_04_cloudveil_skyrealm_map_v01.png", "landmarks": ["左侧云岚高原", "中部浮石风谷", "右侧天穹古城", "浅暖灰石路"], "reference_id": null, "status": "approved"}
+  ]
+}

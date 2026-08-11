@@ -1,0 +1,43 @@
+:root {
+  color-scheme: light;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --ink: #3a302b;
+  --ink-soft: #65554c;
+  --cream: #f7efd9;
+  --paper: #e5dac3;
+  --coral: #d96f5f;
+  --green: #7f9b63;
+  --green-dark: #506f51;
+  --green-light: #c7d9aa;
+  --blue: #78add6;
+  --yellow: #f1c85d;
+  --purple: #a96fd0;
+  --panel-radius: 14px;
+  --outline: 3px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  overflow-x: hidden;
+  background: #27362f;
+  color: var(--ink);
+}
+
+button,
+select {
+  font: inherit;
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}

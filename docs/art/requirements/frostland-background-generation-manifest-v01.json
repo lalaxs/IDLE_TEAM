@@ -1,0 +1,154 @@
+{
+  "review": {
+    "title": "FROSTLAND / 12 STAGES + CHAPTER MAP",
+    "regions": [
+      {
+        "id": "snowfield",
+        "title": "SNOWFIELD / 2-1 — 2-4",
+        "filename": "snowfield_contact_sheet_v01.jpg"
+      },
+      {
+        "id": "pinewood",
+        "title": "PINEWOOD / 2-5 — 2-8",
+        "filename": "pinewood_contact_sheet_v01.jpg"
+      },
+      {
+        "id": "aurora_ruins",
+        "title": "AURORA RUINS / 2-9 — 2-12",
+        "filename": "aurora_ruins_contact_sheet_v01.jpg"
+      }
+    ]
+  },
+  "entries": [
+    {
+      "id": "BG-02-01",
+      "stage": "2-1",
+      "region": "snowfield",
+      "name": "雪线驿道",
+      "filename": "bg_stage_02_01_snowline_road_v01.png",
+      "landmarks": ["低矮雪堆", "无文字旧路桩", "耐寒草"],
+      "reference_id": null,
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-02",
+      "stage": "2-2",
+      "region": "snowfield",
+      "name": "霜河浅滩",
+      "filename": "bg_stage_02_02_frost_river_shallows_v01.png",
+      "landmarks": ["冻结浅河", "圆润蓝冰", "冻土岸"],
+      "reference_id": "BG-02-01",
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-03",
+      "stage": "2-3",
+      "region": "snowfield",
+      "name": "风蚀雪坡",
+      "filename": "bg_stage_02_03_windworn_snow_slope_v01.png",
+      "landmarks": ["层叠雪坡", "外露冻土", "压弯矮灌木"],
+      "reference_id": "BG-02-01",
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-04",
+      "stage": "2-4",
+      "region": "snowfield",
+      "name": "断索冰桥",
+      "filename": "bg_stage_02_04_broken_rope_ice_bridge_v01.png",
+      "landmarks": ["旧木桥头", "断裂粗绳", "冰壳木桩"],
+      "reference_id": "BG-02-01",
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-05",
+      "stage": "2-5",
+      "region": "pinewood",
+      "name": "雪松林口",
+      "filename": "bg_stage_02_05_snow_pine_gate_v01.png",
+      "landmarks": ["粗圆雪松", "覆雪树冠", "中空旧树桩"],
+      "reference_id": null,
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-06",
+      "stage": "2-6",
+      "region": "pinewood",
+      "name": "蓝冰溪谷",
+      "filename": "bg_stage_02_06_blue_ice_creek_v01.png",
+      "landmarks": ["窄冰溪", "圆润蓝冰石", "低矮冷雾"],
+      "reference_id": "BG-02-05",
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-07",
+      "stage": "2-7",
+      "region": "pinewood",
+      "name": "倒木迷径",
+      "filename": "bg_stage_02_07_fallen_timber_path_v01.png",
+      "landmarks": ["覆雪倒木", "抬高树根", "折断枝杈"],
+      "reference_id": "BG-02-05",
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-08",
+      "stage": "2-8",
+      "region": "pinewood",
+      "name": "寒灯营地",
+      "filename": "bg_stage_02_08_cold_lantern_camp_v01.png",
+      "landmarks": ["空白木牌", "熄灭提灯", "圆石营地圈"],
+      "reference_id": "BG-02-05",
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-09",
+      "stage": "2-9",
+      "region": "aurora_ruins",
+      "name": "极光石原",
+      "filename": "bg_stage_02_09_aurora_stonefield_v01.png",
+      "landmarks": ["无符号立石", "宽极光带", "低矮冻岩"],
+      "reference_id": null,
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-10",
+      "stage": "2-10",
+      "region": "aurora_ruins",
+      "name": "冻结石环",
+      "filename": "bg_stage_02_10_frozen_stone_ring_v01.png",
+      "landmarks": ["断裂石环", "粗冰壳", "空白界石"],
+      "reference_id": "BG-02-09",
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-11",
+      "stage": "2-11",
+      "region": "aurora_ruins",
+      "name": "冰脊门廊",
+      "filename": "bg_stage_02_11_ice_ridge_portico_v01.png",
+      "landmarks": ["不透明冰脊", "门廊剪影", "开放中央"],
+      "reference_id": "BG-02-09",
+      "status": "approved"
+    },
+    {
+      "id": "BG-02-12",
+      "stage": "2-12",
+      "region": "aurora_ruins",
+      "name": "霜心堡垒",
+      "filename": "bg_stage_02_12_frostheart_fortress_v01.png",
+      "landmarks": ["冻石内腔", "青紫霜心", "旧堡垒肩墙"],
+      "reference_id": "BG-02-09",
+      "status": "approved"
+    },
+    {
+      "id": "BG-MAP-02",
+      "stage": null,
+      "region": "chapter",
+      "name": "霜原",
+      "filename": "bg_chapter_02_frostland_map_v01.png",
+      "landmarks": ["左侧冻土前哨", "中部雪松幽林", "右侧极光遗迹", "浅灰蓝蜿蜒路线"],
+      "reference_id": null,
+      "status": "approved"
+    }
+  ]
+}

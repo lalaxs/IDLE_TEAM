@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 塔林 · 游侠：叶冠 + 弓 -->
+  <g stroke="#3a302b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="64" cy="111" rx="28" ry="7" fill="#4d6045" opacity=".2" stroke="none"/>
+    <path d="M53 72l-9 39h42l-9-39" fill="#719458"/>
+    <path d="M50 76l28 28" stroke="#5a4030" stroke-width="4"/>
+    <path d="M78 78v16" stroke="#76523b" stroke-width="5"/>
+    <circle cx="64" cy="48" r="32" fill="#d9ab7b"/>
+    <path d="M39 28l12 7 8-16 9 15 17-12-3 18H36z" fill="#5e7449"/>
+    <path d="M88 16c12 2 16 14 10 24-8-4-12-12-14-20z" fill="#4a5f3a"/>
+    <ellipse cx="55" cy="50" rx="4" ry="6" fill="#292420" stroke="none"/>
+    <ellipse cx="77" cy="49" rx="4" ry="6" fill="#292420" stroke="none"/>
+    <path d="M45 84l-16 15M82 83l17 15" fill="none"/>
+    <path d="M50 108l-7 10M78 108l7 10" fill="none"/>
+    <path d="M99 80q13 11 0 26M99 80q-9 13 0 26" fill="none" stroke="#76523b"/>
+    <path d="M91 93h16" stroke="#9a7a55" stroke-width="3"/>
+    <path d="M110 93l-6-3v6z" fill="#d8c27c" stroke-width="3"/>
+  </g>
+</svg>

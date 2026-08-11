@@ -1,0 +1,104 @@
+{
+  "version": "1.1",
+  "region": {
+    "id": "forest",
+    "name": "青丘边境·森林",
+    "stages": ["1-5", "1-6", "1-7", "1-8"],
+    "palette": ["深木棕", "苔藓绿", "暗森林绿", "溪石蓝灰", "潮土棕", "琥珀黄", "近黑描边"]
+  },
+  "style_references": {
+    "hero": "docs/art/references/hero-style-master-v1.png",
+    "monster_batch": "docs/art/generated/monsters/grassland/review/grassland-monsters-contact-sheet-v04.png",
+    "region_palette": "docs/art/generated/backgrounds/qingqiu-frontier/review/forest_contact_sheet_v01.jpg"
+  },
+  "monsters": [
+    {
+      "id": "E05",
+      "stage": "1-5",
+      "type": "normal",
+      "name": "荆棘獾",
+      "slug": "thorn-badger",
+      "visual_anchors": ["圆滚獾体与奶白面纹", "背部三枚圆钝棘芽"],
+      "palette": ["暗棕", "灰褐", "奶白", "苔藓绿", "枯枝棕", "近黑描边"],
+      "source_file": "e05_thorn-badger_concept_source_v02.png",
+      "transparent_file": "e05_thorn-badger_concept_v02.png"
+    },
+    {
+      "id": "E06",
+      "stage": "1-6",
+      "type": "normal",
+      "name": "苔背蛙",
+      "slug": "mossback-frog",
+      "visual_anchors": ["大头圆腹蛙体", "背部单块苔石帽"],
+      "palette": ["暗叶绿", "苔藓绿", "溪石蓝灰", "浅腹黄绿", "琥珀黄", "近黑描边"],
+      "source_file": "e06_mossback-frog_concept_source_v02.png",
+      "transparent_file": "e06_mossback-frog_concept_v02.png"
+    },
+    {
+      "id": "E07",
+      "stage": "1-7",
+      "type": "normal",
+      "name": "暮翼蝠",
+      "slug": "duskwing-bat",
+      "visual_anchors": ["圆球身体与短宽翼", "双叶片形大耳"],
+      "palette": ["深灰蓝", "暗紫灰", "灰绿翼膜", "琥珀黄", "近黑描边"],
+      "source_file": "e07_duskwing-bat_concept_source_v02.png",
+      "transparent_file": "e07_duskwing-bat_concept_v02.png"
+    },
+    {
+      "id": "E08",
+      "stage": "1-8",
+      "type": "elite",
+      "name": "盘根卫",
+      "slug": "coiled-root-guard",
+      "visual_anchors": ["圆根团躯干与苔叶顶", "两只手套形粗根臂"],
+      "palette": ["深木棕", "潮土棕", "苔藓绿", "暗森林绿", "琥珀黄", "近黑描边"],
+      "source_file": "e08_coiled-root-guard_concept_source_v02.png",
+      "transparent_file": "e08_coiled-root-guard_concept_v02.png"
+    },
+    {
+      "id": "B05",
+      "stage": "1-5",
+      "type": "boss",
+      "name": "林口哨卫",
+      "slug": "forest-gate-sentry",
+      "visual_anchors": ["圆桶树桩与浅空心木环", "短粗枝臂和苔藓披肩"],
+      "palette": ["深木棕", "断木浅棕", "苔藓绿", "暗森林绿", "琥珀黄", "近黑描边"],
+      "source_file": "b05_forest-gate-sentry_concept_source_v02.png",
+      "transparent_file": "b05_forest-gate-sentry_concept_v02.png"
+    },
+    {
+      "id": "B06",
+      "stage": "1-6",
+      "type": "boss",
+      "name": "暗溪巨蛙",
+      "slug": "dark-creek-giant-frog",
+      "visual_anchors": ["大头圆腹巨蛙与宽蹼掌", "背部三块大溪石和苔藓眉"],
+      "palette": ["深森林绿", "暗青绿", "溪石蓝灰", "苔藓绿", "浅腹黄绿", "琥珀黄", "近黑描边"],
+      "source_file": "b06_dark-creek-giant-frog_concept_source_v02.png",
+      "transparent_file": "b06_dark-creek-giant-frog_concept_v02.png"
+    },
+    {
+      "id": "B07",
+      "stage": "1-7",
+      "type": "boss",
+      "name": "缠根树怪",
+      "slug": "entwined-root-tree-beast",
+      "visual_anchors": ["低伏圆木树兽核心", "三条环抱粗根与短根爪"],
+      "palette": ["深木棕", "湿土棕", "苔藓绿", "暗森林绿", "断木浅棕", "琥珀黄", "近黑描边"],
+      "source_file": "b07_entwined-root-tree-beast_concept_source_v02.png",
+      "transparent_file": "b07_entwined-root-tree-beast_concept_v02.png"
+    },
+    {
+      "id": "B08",
+      "stage": "1-8",
+      "type": "boss",
+      "name": "碑背巨蜥",
+      "slug": "steleback-giant-lizard",
+      "visual_anchors": ["圆头短腿巨蜥与粗短尾", "背部空白圆角残碑和三块大石鳞"],
+      "palette": ["深青灰", "暖灰旧石", "暗森林绿", "潮土棕", "苔藓绿", "琥珀黄", "近黑描边"],
+      "source_file": "b08_steleback-giant-lizard_concept_source_v02.png",
+      "transparent_file": "b08_steleback-giant-lizard_concept_v02.png"
+    }
+  ]
+}

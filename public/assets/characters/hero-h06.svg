@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 乌鸦 · 刺客：暗箍 + 短刃 -->
+  <g stroke="#302b31" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="64" cy="111" rx="28" ry="7" fill="#403d4b" opacity=".22" stroke="none"/>
+    <path d="M53 72l-9 39h42l-9-39" fill="#565267"/>
+    <path d="M52 72h24v8H52z" fill="#34333f" stroke-width="3.5"/>
+    <path d="M58 88h12" stroke="#7d5a43" stroke-width="3"/>
+    <circle cx="64" cy="48" r="32" fill="#d7aa82"/>
+    <path d="M34 36h60" stroke="#34333f" stroke-width="7"/>
+    <path d="M60 16l4-8 4 8v6H60z" fill="#34333f"/>
+    <ellipse cx="54" cy="50" rx="4" ry="6" fill="#1e1c20" stroke="none"/>
+    <ellipse cx="78" cy="49" rx="4" ry="6" fill="#1e1c20" stroke="none"/>
+    <path d="M45 84l-16 15M82 83l17 15" fill="none"/>
+    <path d="M50 108l-7 10M78 108l7 10" fill="none"/>
+    <path d="M98 92l16-16-2 24z" fill="#b5c2bf"/>
+    <path d="M94 98h12" stroke="#7d5a43" stroke-width="4"/>
+  </g>
+</svg>

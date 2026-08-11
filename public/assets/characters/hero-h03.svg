@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 米娅 · 火法：焰冠 + 火杖 -->
+  <g stroke="#3a302b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="64" cy="111" rx="28" ry="7" fill="#684d3a" opacity=".2" stroke="none"/>
+    <path d="M53 72l-9 39h42l-9-39" fill="#b65343"/>
+    <path d="M52 92h24" stroke="#f1b84b" stroke-width="4"/>
+    <circle cx="64" cy="92" r="4" fill="#f1b84b" stroke-width="3"/>
+    <circle cx="64" cy="48" r="32" fill="#efd0a0"/>
+    <path d="M40 28l10 6 8-14 8 14 12-8-2 12H38z" fill="#d87643"/>
+    <circle cx="64" cy="20" r="4" fill="#f1b84b" stroke="#b75238" stroke-width="3"/>
+    <ellipse cx="55" cy="50" rx="4" ry="6" fill="#2a2522" stroke="none"/>
+    <ellipse cx="77" cy="49" rx="4" ry="6" fill="#2a2522" stroke="none"/>
+    <path d="M45 84l-16 15M82 83l17 15" fill="none"/>
+    <path d="M50 108l-7 10M78 108l7 10" fill="none"/>
+    <path d="M98 106l9-32" fill="none" stroke="#6c4b34" stroke-width="6"/>
+    <path d="M107 72q-8-12 2-20 12 12 2 22z" fill="#f1b84b" stroke="#b75238"/>
+  </g>
+</svg>

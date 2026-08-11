@@ -1,0 +1,108 @@
+{
+  "version": "1.3",
+  "region": {
+    "id": "grassland",
+    "name": "青丘边境·草地",
+    "stages": ["1-1", "1-2", "1-3", "1-4"]
+  },
+  "references": [
+    {
+      "path": "docs/art/references/hero-style-master-v1.png",
+      "role": "authoritative style reference"
+    },
+    {
+      "path": "docs/art/generated/bosses/concepts/boss_b01_moss_crown_guardian_concept_v01_preview.jpg",
+      "role": "supporting monster scale and rendering-density reference"
+    }
+  ],
+  "monsters": [
+    {
+      "id": "E01",
+      "stage": "1-1",
+      "type": "normal",
+      "name": "嫩枝精",
+      "slug": "tender-branch-sprite",
+      "visual_anchors": ["梨形浅木身体", "头顶两片宽嫩叶"],
+      "palette": ["浅木棕", "嫩叶绿", "深叶绿", "近黑描边"],
+      "source_file": "e01_tender-branch-sprite_concept_source_v01.png",
+      "transparent_file": "e01_tender-branch-sprite_concept_v01.png"
+    },
+    {
+      "id": "E02",
+      "stage": "1-2",
+      "type": "normal",
+      "name": "红帽菌兽",
+      "slug": "red-cap-fungus",
+      "visual_anchors": ["宽大的暗红菌帽", "米色短菌柄身体"],
+      "palette": ["暗砖红", "暖米色", "土棕", "近黑描边"],
+      "source_file": "e02_red-cap-fungus_concept_source_v01.png",
+      "transparent_file": "e02_red-cap-fungus_concept_v01.png"
+    },
+    {
+      "id": "E03",
+      "stage": "1-3",
+      "type": "normal",
+      "name": "灰壳甲虫",
+      "slug": "gray-shell-beetle",
+      "visual_anchors": ["圆形灰石甲壳", "单根短前角"],
+      "palette": ["暖灰石色", "土棕", "琥珀黄", "近黑描边"],
+      "source_file": "e03_gray-shell-beetle_concept_source_v01.png",
+      "transparent_file": "e03_gray-shell-beetle_concept_v01.png"
+    },
+    {
+      "id": "E04",
+      "stage": "1-4",
+      "type": "elite",
+      "name": "老桩卫",
+      "slug": "old-stump-guard",
+      "visual_anchors": ["平切树桩头与两圈年轮", "粗壮枝臂"],
+      "palette": ["深树皮棕", "年轮浅棕", "苔叶绿", "琥珀黄", "近黑描边"],
+      "source_file": "e04_old-stump-guard_concept_source_v01.png",
+      "transparent_file": "e04_old-stump-guard_concept_v01.png"
+    },
+    {
+      "id": "B01",
+      "stage": "1-1",
+      "type": "boss",
+      "name": "刺根兽",
+      "slug": "thorn-root-beast",
+      "visual_anchors": ["矮宽根球兽体", "两只短刺根拳"],
+      "palette": ["深根棕", "暖木棕", "嫩芽绿", "琥珀黄", "近黑描边"],
+      "source_file": "b01_thorn-root-beast_concept_source_v01.png",
+      "transparent_file": "b01_thorn-root-beast_concept_v01.png"
+    },
+    {
+      "id": "B02",
+      "stage": "1-2",
+      "type": "boss",
+      "name": "大伞菌母",
+      "slug": "broad-cap-matriarch",
+      "visual_anchors": ["单个巨大赭红伞盖", "两只菌袋状圆臂"],
+      "palette": ["赭暗红", "暖奶油色", "菌褶土棕", "近黑描边"],
+      "source_file": "b02_broad-cap-matriarch_concept_source_v01.png",
+      "transparent_file": "b02_broad-cap-matriarch_concept_v01.png"
+    },
+    {
+      "id": "B03",
+      "stage": "1-3",
+      "type": "boss",
+      "name": "岩背甲虫",
+      "slug": "rock-back-beetle",
+      "visual_anchors": ["三块大型岩板背甲", "沉重宽前足"],
+      "palette": ["中灰石色", "深灰石色", "泥土棕", "琥珀黄", "近黑描边"],
+      "source_file": "b03_rock-back-beetle_concept_source_v01.png",
+      "transparent_file": "b03_rock-back-beetle_concept_v01.png"
+    },
+    {
+      "id": "B04",
+      "stage": "1-4",
+      "type": "boss",
+      "name": "风帆蜥",
+      "slug": "wind-sail-lizard",
+      "visual_anchors": ["两片后掠叶形背帆", "宽爪长尾重甲蜥体"],
+      "palette": ["橄榄绿", "赭黄色", "灰绿色", "土棕", "琥珀黄", "近黑描边"],
+      "source_file": "b04_wind-sail-lizard_concept_source_v04.png",
+      "transparent_file": "b04_wind-sail-lizard_concept_v04.png"
+    }
+  ]
+}

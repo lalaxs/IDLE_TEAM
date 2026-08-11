@@ -1,0 +1,132 @@
+[
+  {
+    "id": "BG-01-01",
+    "stage": "1-1",
+    "region": "meadow",
+    "name": "新芽小径",
+    "filename": "bg_stage_01_01_sprout_path_v01.png",
+    "landmarks": ["嫩根拱出地面", "双叶幼芽"],
+    "reference_id": null,
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-02",
+    "stage": "1-2",
+    "region": "meadow",
+    "name": "蘑菇浅滩",
+    "filename": "bg_stage_01_02_mushroom_shallows_v01.png",
+    "landmarks": ["红帽菌簇", "浅水石", "低矮湿地边缘"],
+    "reference_id": "BG-01-01",
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-03",
+    "stage": "1-3",
+    "region": "meadow",
+    "name": "石甲坡地",
+    "filename": "bg_stage_01_03_stone_slope_v01.png",
+    "landmarks": ["层叠灰石坡", "短粗岩块", "耐旱草"],
+    "reference_id": "BG-01-01",
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-04",
+    "stage": "1-4",
+    "region": "meadow",
+    "name": "风语栈桥",
+    "filename": "bg_stage_01_04_wind_bridge_v01.png",
+    "landmarks": ["旧木栈桥", "悬挂木片", "风动种荚"],
+    "reference_id": "BG-01-01",
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-05",
+    "stage": "1-5",
+    "region": "forest",
+    "name": "守望林口",
+    "filename": "bg_stage_01_05_watchwood_gate_v01.png",
+    "landmarks": ["哨塔形中空树桩", "向内收拢的树冠"],
+    "reference_id": null,
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-06",
+    "stage": "1-6",
+    "region": "forest",
+    "name": "暮色溪谷",
+    "filename": "bg_stage_01_06_twilight_creek_v01.png",
+    "landmarks": ["圆润溪石", "窄溪", "贴地薄雾"],
+    "reference_id": "BG-01-05",
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-07",
+    "stage": "1-7",
+    "region": "forest",
+    "name": "盘根小径",
+    "filename": "bg_stage_01_07_tangled_root_path_v01.png",
+    "landmarks": ["道路两侧粗根", "少量棘枝", "抬高林地"],
+    "reference_id": "BG-01-05",
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-08",
+    "stage": "1-8",
+    "region": "forest",
+    "name": "古碑营地",
+    "filename": "bg_stage_01_08_stele_camp_v01.png",
+    "landmarks": ["残碑", "熄灭火盆", "低矮营地石圈"],
+    "reference_id": "BG-01-05",
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-09",
+    "stage": "1-9",
+    "region": "ruins",
+    "name": "雾松腹地",
+    "filename": "bg_stage_01_09_mist_pine_depths_v01.png",
+    "landmarks": ["苍白松干", "圆团雾气", "稀疏松冠"],
+    "reference_id": null,
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-10",
+    "stage": "1-10",
+    "region": "ruins",
+    "name": "藤蔓祭场",
+    "filename": "bg_stage_01_10_vine_altar_v01.png",
+    "landmarks": ["低矮石坛", "粗藤环", "四角残石"],
+    "reference_id": "BG-01-09",
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-11",
+    "stage": "1-11",
+    "region": "ruins",
+    "name": "巨木门廊",
+    "filename": "bg_stage_01_11_giantwood_portico_v01.png",
+    "landmarks": ["断木柱门形剪影", "少量旧石"],
+    "reference_id": "BG-01-09",
+    "status": "approved"
+  },
+  {
+    "id": "BG-01-12",
+    "stage": "1-12",
+    "region": "ruins",
+    "name": "古树之心",
+    "filename": "bg_stage_01_12_ancient_tree_heart_v01.png",
+    "landmarks": ["琥珀色树心", "残碑肩形结构", "古树内腔"],
+    "reference_id": "BG-01-09",
+    "status": "approved"
+  },
+  {
+    "id": "BG-MAP-01",
+    "stage": null,
+    "region": "chapter",
+    "name": "青丘边境",
+    "filename": "bg_chapter_01_qingqiu_frontier_map_v01.png",
+    "landmarks": ["左侧草地", "中部森林", "右侧遗迹古树", "浅色蜿蜒道路"],
+    "reference_id": null,
+    "status": "approved"
+  }
+]
