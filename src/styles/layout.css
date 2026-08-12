@@ -51,6 +51,7 @@ body {
   overflow: hidden;
   container-type: size;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows:
     calc(54px + env(safe-area-inset-top))
     clamp(228px, 35cqh, 308px)
@@ -59,31 +60,37 @@ body {
     calc(66px + env(safe-area-inset-bottom));
 }
 
-.game-shell > .topbar { grid-row: 1; }
-.game-shell > .battle-frame { grid-row: 2; }
-.game-shell > .party-strip { grid-row: 3; }
+.game-shell > .topbar { grid-column: 1; grid-row: 1; }
+.game-shell > .battle-frame { grid-column: 1; grid-row: 2; }
+.game-shell > .party-strip { grid-column: 1; grid-row: 3; }
+.game-shell:has(.alchemy-tips-host:not(:empty)) > .party-strip {
+  /* Floating tips cover the party strip while previewing. */
+  visibility: hidden;
+}
 .game-shell > .alchemy-tips-host {
-  /* Anchor to party-strip row so height matches real layout (avoids cqh calc drift). */
+  /* Same cell as party-strip; full-width band extends into content (annotated frame). */
   grid-column: 1;
   grid-row: 3;
   z-index: 14;
   position: relative;
-  align-self: end;
+  align-self: start;
   justify-self: stretch;
   width: 100%;
-  height: calc(100% + 72px);
-  margin-top: -60px;
-  margin-bottom: -12px;
+  min-width: 0;
+  height: calc(100% + 120px);
+  margin: 0 0 -120px;
+  overflow: hidden;
   pointer-events: none;
 }
 
 .game-shell > .alchemy-tips-host:empty {
   display: none;
 }
-.game-shell > .content-panel { grid-row: 4; }
-.game-shell > .bottom-nav { grid-row: 5; }
+.game-shell > .content-panel { grid-column: 1; grid-row: 4; }
+.game-shell > .bottom-nav { grid-column: 1; grid-row: 5; }
 .game-shell > .overlay-layer {
-  grid-area: 1 / 1 / -1 / -1;
+  grid-column: 1;
+  grid-row: 1 / -1;
 }
 
 #battle-canvas {

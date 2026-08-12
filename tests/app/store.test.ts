@@ -15,6 +15,24 @@ describe("GameStore meta loop", () => {
     expect(store.getState().save.roster.H08?.unlocked).toBe(true);
   });
 
+  it("emits summon results for unlocks and duplicate marks", () => {
+    const save = createDefaultSave();
+    save.gems = 1000;
+    save.roster.H07.unlocked = true;
+    save.roster.H08.unlocked = true;
+    const store = new GameStore(save);
+    let resultCount = 0;
+    store.subscribe((_state, events) => {
+      const completed = events.find((event) => event.type === "summon:completed");
+      if (completed?.type === "summon:completed") {
+        resultCount = completed.results.length;
+        expect(completed.results.every((pull) => pull.kind === "marks" && pull.marks === 20)).toBe(true);
+      }
+    });
+    store.dispatch({ type: "summon:five" });
+    expect(resultCount).toBe(5);
+  });
+
   it("rejects duplicate heroes in a saved party", () => {
     const store = new GameStore(createDefaultSave());
     expect(() =>
@@ -42,6 +60,20 @@ describe("GameStore meta loop", () => {
     store.dispatch({ type: "item:equip", heroId: "H01", itemId: item.instanceId });
     expect(store.getState().save.roster.H01?.equipment.main_weapon).toBe(item.instanceId);
     expect(store.getState().save.inventory).toContainEqual(item);
+  });
+
+  it("does not count equipped items toward backpack capacity", () => {
+    const save = createDefaultSave();
+    save.inventory = Array.from({ length: 40 }, (_, index) =>
+      createEquipment("weapon_guard_blade", 1, "common", new SeededRandom(index + 1)),
+    );
+    const equipped = save.inventory[0]!;
+    save.roster.H01.equipment.main_weapon = equipped.instanceId;
+    const store = new GameStore(save);
+    const incoming = createEquipment("weapon_oak_staff", 1, "rare", new SeededRandom(999));
+    store.dispatch({ type: "item:add", item: incoming });
+    expect(store.getState().save.inventory).toContainEqual(incoming);
+    expect(store.getState().save.inventory.length).toBe(41);
   });
 
   it("claims offline gold and equipment without changing stage progress", () => {

@@ -17,16 +17,29 @@ import { SET_BY_ID } from "../content/sets";
 import { RARITY_ORDER } from "../content/rarities";
 import { ACTIVE_SKILL_BY_HERO, PASSIVE_SKILL_BY_HERO } from "../content/skills";
 import { STAGE_DEFINITIONS } from "../content/stages";
-import { compareInventoryItems, describeItemAffixes, getItemScore, getSalvageGold, type InventoryItem } from "../progression/EquipmentSystem";
+import {
+  BACKPACK_CAPACITY,
+  backpackItems,
+  compareInventoryItems,
+  countBackpackItems,
+  describeItemAffixes,
+  getItemScore,
+  getSalvageGold,
+  type InventoryItem,
+} from "../progression/EquipmentSystem";
+import {
+  getEquipmentBonuses,
+  getHeroCombatDisplayStats,
+} from "../progression/EquipmentBonuses";
 import {
   ALCHEMY_SLOT_COUNT,
   alchemyCandidateItems,
   pickAlchemyAutoFill,
   validateAlchemyInputs,
 } from "../progression/AlchemySystem";
-import { getHeroStats, getUpgradeCost } from "../progression/HeroProgression";
+import { getStarUpgradeCost, getUpgradeCost, MAX_HERO_STARS } from "../progression/HeroProgression";
 import type { GameStore, GameStoreState } from "../app/GameStore";
-import type { AppEvent } from "../app/events";
+import type { AppEvent, SummonPullResult } from "../app/events";
 import type { BattleEvent, BattleSnapshot, HeroId } from "../simulation/types";
 import { bindDragScroll } from "./dragScroll";
 
@@ -47,6 +60,8 @@ const tabMeta = {
 
 const rarityClass = (rarity: Rarity): string => `rarity-${rarity}`;
 const slotLabel = SLOT_LABELS;
+/** Max attribute rows in the left column before overflowing to the right. */
+const EQUIP_STATS_LEFT_CAPACITY = 10;
 const slotEmptyIcon: Record<EquipmentSlot, string> = {
   main_weapon: "⚔",
   off_hand: "⛨",
@@ -77,25 +92,70 @@ function itemBaseLines(item: InventoryItem): string[] {
 }
 
 /** Compact single-line stats for lists and shop rows. */
-function itemStats(item: InventoryItem): string {
-  return [...itemBaseLines(item), ...describeItemAffixes(item)].join(" · ");
+function itemSchoolLabel(item: InventoryItem): string {
+  return ITEM_BY_ID[item.definitionId]!.school === "magic" ? "法系" : "物理";
 }
 
-/** Structured blocks for detail / compare cards. */
-function itemStatsBlocks(item: InventoryItem): string {
+function itemKindLabel(item: InventoryItem): string {
+  return `${slotLabel[item.slot]} · ${itemSchoolLabel(item)}`;
+}
+
+/** Two-column equipment detail: left meta, right stats/effects. */
+function itemDetailSheet(item: InventoryItem, options: { showPower?: boolean } = {}): string {
+  const definition = ITEM_BY_ID[item.definitionId]!;
+  const trait = item.traitId ? TRAIT_BY_ID[item.traitId] : null;
+  const set = definition.setId ? SET_BY_ID[definition.setId] : null;
   const base = itemBaseLines(item);
   const affixes = describeItemAffixes(item);
-  const parts: string[] = [];
-  if (base.length) {
-    parts.push(`<p class="item-stat-block"><small>底座</small>${base.join(" · ")}</p>`);
+  const showPower = options.showPower !== false;
+
+  const baseHtml = base.length
+    ? base.map((line) => `<div class="item-stat-line">${line}</div>`).join("")
+    : `<div class="item-stat-line muted">无固定属性</div>`;
+  const affixHtml = affixes.length
+    ? affixes.map((line) => `<div class="item-stat-line affix">${line}</div>`).join("")
+    : `<div class="item-stat-line muted">无词条</div>`;
+
+  const effects: string[] = [];
+  if (set) {
+    effects.push(
+      `<div class="item-effect-line">套装 · ${set.name}<small>同套 2/4/6 件激活加成</small></div>`,
+    );
   }
-  if (affixes.length) {
-    parts.push(`<p class="item-stat-block"><small>词条</small>${affixes.join(" · ")}</p>`);
+  if (trait) {
+    effects.push(
+      `<div class="item-effect-line">传奇 · ${trait.name}<small>${trait.description}</small></div>`,
+    );
   }
-  if (!parts.length) {
-    parts.push(`<p class="item-stat-block muted">无基础属性</p>`);
-  }
-  return parts.join("");
+  const effectHtml = effects.length
+    ? effects.join("")
+    : `<div class="item-effect-line muted">无特殊效果</div>`;
+
+  return `
+    <div class="item-detail-sheet">
+      <div class="item-detail-left">
+        <div class="detail-icon item-detail-icon ${rarityClass(item.rarity)}">${equipmentArt(definition.icon)}</div>
+        <strong class="item-detail-name">${definition.name}</strong>
+        <span class="item-detail-kind">${itemKindLabel(item)}</span>
+        <span class="item-detail-rarity">${RARITY_LABELS[item.rarity]}</span>
+        ${showPower ? `<p class="equip-power">战力 ${getItemScore(item)}</p>` : ""}
+      </div>
+      <div class="item-detail-right">
+        <section class="item-detail-section" aria-label="固定属性">
+          <small class="item-stat-heading">固定属性</small>
+          ${baseHtml}
+        </section>
+        <section class="item-detail-section" aria-label="词条">
+          <small class="item-stat-heading">词条</small>
+          ${affixHtml}
+        </section>
+        <section class="item-detail-section" aria-label="特殊效果">
+          <small class="item-stat-heading">特殊效果</small>
+          ${effectHtml}
+        </section>
+      </div>
+    </div>
+  `;
 }
 
 
@@ -109,18 +169,22 @@ export class AppShell {
   private selectedHeroId: HeroId = "H01";
   private equipTargetHeroId: HeroId = "H01";
   private equipFocusSlot: EquipmentSlot = "main_weapon";
+  private equipPanelTab: "gear" | "stats" = "gear";
+  private equipTipsKind: "compare" | "unequip" | "skill" | null = null;
+  private equipSkillTipsKind: "active" | "passive" | null = null;
   private inventoryFilter: EquipmentSlot | "all" = "all";
   private salvageSlotFilter: EquipmentSlot | "all" = "all";
   private salvageRarityFilter: Set<Rarity> = new Set<Rarity>(["common"]);
   private salvageSelectedIds: Set<string> = new Set();
   private alchemySlots: (string | null)[] = Array.from({ length: ALCHEMY_SLOT_COUNT }, () => null);
   private alchemyPreviewId: string | null = null;
+  private itemTipsSource: "inventory" | "alchemy" = "inventory";
   private modal: string | null = null;
   private modalPayload: unknown = null;
   private tutorialStep = 0;
   private formationDraft: GameStoreState["save"]["party"];
   private formationSlot = 0;
-  private summonResultHero: HeroId | null = null;
+  private summonResults: SummonPullResult[] | null = null;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private partyStructureKey = "";
   private readonly topbar: HTMLElement;
@@ -335,12 +399,14 @@ export class AppShell {
   }
 
   private renderInventory(state: GameStoreState): void {
-    const sorted = [...state.save.inventory]
+    const equippedIds = this.equippedInstanceIds(state);
+    const sorted = backpackItems(state.save.inventory, equippedIds)
       .filter((item) => this.inventoryFilter === "all" || item.slot === this.inventoryFilter)
       .sort(compareInventoryItems);
+    const occupied = countBackpackItems(state.save.inventory, equippedIds);
     this.content.innerHTML = `
       <div class="panel-heading compact" data-panel="inventory">
-        <span class="panel-meta" aria-label="背包容量">${state.save.inventory.length}/40</span>
+        <span class="panel-meta" aria-label="背包容量">${occupied}/${BACKPACK_CAPACITY}</span>
         <div class="panel-actions">
           <button class="secondary-button compact" data-action="inventory-organize">整理</button>
           <button class="secondary-button compact" data-action="inventory-salvage-open">分解</button>
@@ -395,7 +461,8 @@ export class AppShell {
   }
 
   private salvageCandidates(state: GameStoreState): InventoryItem[] {
-    return [...state.save.inventory]
+    const equipped = this.equippedInstanceIds(state);
+    return backpackItems(state.save.inventory, equipped)
       .filter((item) => {
         if (!this.salvageRarityFilter.has(item.rarity)) return false;
         if (this.salvageSlotFilter !== "all" && item.slot !== this.salvageSlotFilter) return false;
@@ -589,8 +656,9 @@ export class AppShell {
         data-action="equip-slot-focus"
         data-slot="${slot}"
         aria-pressed="${slot === focusSlot ? "true" : "false"}"
-        aria-label="${slotLabel[slot]}${equipped && definition ? `：${definition.name}` : "：空"}，点击筛选该槽位装备"
+        aria-label="${slotLabel[slot]}${equipped && definition ? `：${definition.name}，点击查看` : "：空，点击筛选该槽位装备"}"
       >
+
         <span class="equip-slot-art" aria-hidden="true">${
           equipped && definition ? equipmentArt(definition.icon) : slotEmptyIcon[slot]
         }</span>
@@ -609,37 +677,273 @@ export class AppShell {
         <article class="equip-compare-card empty ${tone}">
           <span class="compare-label">${label}</span>
           <div class="compare-empty">空</div>
-          <p>${tone === "current" ? "当前槽位未装备" : "请在下方选择装备"}</p>
+          <p>${tone === "current" ? "该槽位暂无装备" : "请选择装备"}</p>
         </article>
       `;
     }
-    const definition = ITEM_BY_ID[item.definitionId]!;
-    const trait = item.traitId ? TRAIT_BY_ID[item.traitId] : null;
-    const set = definition.setId ? SET_BY_ID[definition.setId] : null;
-    const schoolLabel = definition.school === "magic" ? "法系" : "物理";
     return `
       <article class="equip-compare-card ${tone} ${rarityClass(item.rarity)}">
         <span class="compare-label">${label}</span>
-        <div class="compare-head">
-          <div class="detail-icon">${equipmentArt(definition.icon)}</div>
-          <div>
-            <span class="rarity-label">${RARITY_LABELS[item.rarity]} · ${slotLabel[item.slot]} · ${schoolLabel}</span>
-            <h3>${definition.name}</h3>
-            <p class="equip-power">战力 ${getItemScore(item)}</p>
+        ${itemDetailSheet(item)}
+      </article>
+    `;
+  }
+
+  private renderEquipPanelTabs(): string {
+    return `
+      <div class="equip-panel-tabs" role="tablist" aria-label="装备与属性">
+        <button
+          type="button"
+          role="tab"
+          class="equip-panel-tab ${this.equipPanelTab === "gear" ? "active" : ""}"
+          data-action="equip-panel-tab"
+          data-tab="gear"
+          aria-selected="${this.equipPanelTab === "gear" ? "true" : "false"}"
+        >装备</button>
+        <button
+          type="button"
+          role="tab"
+          class="equip-panel-tab ${this.equipPanelTab === "stats" ? "active" : ""}"
+          data-action="equip-panel-tab"
+          data-tab="stats"
+          aria-selected="${this.equipPanelTab === "stats" ? "true" : "false"}"
+        >属性</button>
+      </div>
+    `;
+  }
+
+  private formatStatValue(value: number, digits = 0): string {
+    if (!Number.isFinite(value)) return "0";
+    if (digits <= 0) return String(Math.round(value));
+    const fixed = value.toFixed(digits);
+    return fixed.replace(/\.?0+$/, "");
+  }
+
+  private getEquipStatsContent(state: GameStoreState, heroId: HeroId): {
+    leftHtml: string;
+    rightHtml: string;
+    skillsHtml: string;
+  } {
+    const progress = state.save.roster[heroId];
+    const bonus = getEquipmentBonuses(state.save)[heroId] ?? {};
+    const stats = getHeroCombatDisplayStats(heroId, progress.level, bonus);
+    const schoolLabel = stats.damageSchool === "magic" ? "魔法" : "物理";
+    const rows: Array<{ label: string; value: string; hide?: boolean }> = [
+      { label: "生命", value: this.formatStatValue(stats.maxHp) },
+      { label: "攻击", value: this.formatStatValue(stats.attack) },
+      { label: "防御", value: this.formatStatValue(stats.defense) },
+      { label: "暴击率", value: `${this.formatStatValue(stats.critChancePct, 1)}%` },
+      { label: "暴击伤害", value: `${this.formatStatValue(stats.critDamagePct, 1)}%` },
+      { label: "攻击间隔", value: `${this.formatStatValue(stats.attackIntervalMs)}ms` },
+      { label: "攻击速度", value: `+${this.formatStatValue(stats.attackSpeedPct, 1)}%` },
+      { label: "攻击射程", value: this.formatStatValue(stats.attackRange) },
+      { label: "移动速度", value: this.formatStatValue(stats.moveSpeed, 1) },
+      { label: "伤害类型", value: schoolLabel },
+      { label: "全伤害", value: `+${this.formatStatValue(stats.damagePct, 1)}%`, hide: stats.damagePct <= 0 },
+      { label: "普攻伤害", value: `+${this.formatStatValue(stats.primaryAttackPct, 1)}%`, hide: stats.primaryAttackPct <= 0 },
+      { label: "技能伤害", value: `+${this.formatStatValue(stats.skillDamagePct, 1)}%`, hide: stats.skillDamagePct <= 0 },
+      { label: "物理伤害", value: `+${this.formatStatValue(stats.physicalDamagePct, 1)}%`, hide: stats.physicalDamagePct <= 0 },
+      { label: "法术伤害", value: `+${this.formatStatValue(stats.magicDamagePct, 1)}%`, hide: stats.magicDamagePct <= 0 },
+      { label: "精英伤害", value: `+${this.formatStatValue(stats.eliteDamagePct, 1)}%`, hide: stats.eliteDamagePct <= 0 },
+      { label: "冷却缩减", value: `${this.formatStatValue(stats.skillCooldownPct, 1)}%` },
+      { label: "技能冷却", value: `${this.formatStatValue(stats.skillCooldownMs)}ms` },
+      { label: "伤害减免", value: `${this.formatStatValue(stats.damageReductionPct, 1)}%`, hide: stats.damageReductionPct <= 0 },
+      { label: "击中回血", value: this.formatStatValue(stats.lifeOnHit), hide: stats.lifeOnHit <= 0 },
+      { label: "生命偷取", value: `${this.formatStatValue(stats.lifeStealPct, 1)}%`, hide: stats.lifeStealPct <= 0 },
+      { label: "每秒回血", value: this.formatStatValue(stats.hpRegenPerSec, 1), hide: stats.hpRegenPerSec <= 0 },
+      { label: "闪避", value: `${this.formatStatValue(stats.dodgeChancePct, 1)}%`, hide: stats.dodgeChancePct <= 0 },
+      { label: "格挡", value: `${this.formatStatValue(stats.blockChancePct, 1)}%`, hide: stats.blockChancePct <= 0 },
+      { label: "移动速度加成", value: `+${this.formatStatValue(stats.moveSpeedPct, 1)}%`, hide: stats.moveSpeedPct <= 0 },
+      { label: "处决伤害", value: `+${this.formatStatValue(stats.executeDamagePct, 1)}%`, hide: stats.executeDamagePct <= 0 },
+      { label: "守护护盾", value: `${this.formatStatValue(stats.guardianShieldPct, 1)}%`, hide: stats.guardianShieldPct <= 0 },
+      { label: "反伤", value: `${this.formatStatValue(stats.thornsPct, 1)}%`, hide: stats.thornsPct <= 0 },
+      { label: "回春", value: `${this.formatStatValue(stats.renewalPct, 1)}%`, hide: stats.renewalPct <= 0 },
+      { label: "霜咬几率", value: `${this.formatStatValue(stats.frostbiteChancePct, 1)}%`, hide: stats.frostbiteChancePct <= 0 },
+      { label: "雪护护盾", value: `${this.formatStatValue(stats.snowguardShieldPct, 1)}%`, hide: stats.snowguardShieldPct <= 0 },
+      { label: "霜聚冷却", value: `${this.formatStatValue(stats.frostfocusCooldownPct, 1)}%`, hide: stats.frostfocusCooldownPct <= 0 },
+      { label: "沙痕几率", value: `${this.formatStatValue(stats.sandscarChancePct, 1)}%`, hide: stats.sandscarChancePct <= 0 },
+      { label: "幻影减伤", value: `${this.formatStatValue(stats.mirageGuardPct, 1)}%`, hide: stats.mirageGuardPct <= 0 },
+      { label: "迅风", value: `${this.formatStatValue(stats.tailwindPct, 1)}%`, hide: stats.tailwindPct <= 0 },
+      { label: "雷霆增伤", value: `${this.formatStatValue(stats.thunderbrandPct, 1)}%`, hide: stats.thunderbrandPct <= 0 },
+      { label: "云纱护盾", value: `${this.formatStatValue(stats.cloudveilShieldPct, 1)}%`, hide: stats.cloudveilShieldPct <= 0 },
+      { label: "风暴护盾", value: `${this.formatStatValue(stats.stormwardShieldPct, 1)}%`, hide: stats.stormwardShieldPct <= 0 },
+    ];
+    const visible = rows.filter((row) => !row.hide);
+    const left = visible.slice(0, EQUIP_STATS_LEFT_CAPACITY);
+    const right = visible.slice(EQUIP_STATS_LEFT_CAPACITY);
+    const renderCol = (items: typeof visible) =>
+      items
+        .map((row) => `<div class="equip-stat-row"><span>${row.label}</span><b>${row.value}</b></div>`)
+        .join("");
+    return {
+      leftHtml: `<div class="equip-stats-side" aria-label="属性左栏">${renderCol(left)}</div>`,
+      rightHtml: `<div class="equip-stats-side" aria-label="属性右栏">${
+        right.length ? renderCol(right) : ""
+      }</div>`,
+      skillsHtml: this.renderEquipSkills(state, heroId),
+    };
+  }
+
+  private renderEquipSkills(state: GameStoreState, heroId: HeroId): string {
+    const active = ACTIVE_SKILL_BY_HERO[heroId];
+    const passive = PASSIVE_SKILL_BY_HERO[heroId];
+    const progress = state.save.roster[heroId];
+    const levelCost = getUpgradeCost(progress.level);
+    const atMaxLevel = progress.level >= 20;
+    const canLevelUp = !atMaxLevel && state.save.gold >= levelCost;
+    const starCost = getStarUpgradeCost(progress.stars);
+    const atMaxStar = starCost == null || progress.stars >= MAX_HERO_STARS;
+    const needed = starCost ?? 0;
+    const have = progress.marks;
+    const fillPct = atMaxStar ? 100 : Math.min(100, Math.round((have / Math.max(1, needed)) * 100));
+    const canStarUp = !atMaxStar && have >= needed;
+    return `
+      <div class="equip-skill-section" aria-label="英雄技能、升级与升星">
+        <div class="equip-skill-list" aria-label="技能栏">
+          <button
+            type="button"
+            class="equip-skill-tile"
+            data-action="equip-skill-tips"
+            data-skill-kind="active"
+            aria-label="查看主动技能 ${active.name}"
+          >
+            <span class="equip-skill-tile-tag" aria-hidden="true">技</span>
+            <strong class="equip-skill-name">${active.name}</strong>
+          </button>
+          <button
+            type="button"
+            class="equip-skill-tile"
+            data-action="equip-skill-tips"
+            data-skill-kind="passive"
+            aria-label="查看被动技能 ${passive.name}"
+          >
+            <span class="equip-skill-tile-tag" aria-hidden="true">被</span>
+            <strong class="equip-skill-name">${passive.name}</strong>
+          </button>
+          <div class="equip-skill-tile empty" aria-hidden="true"></div>
+          <div class="equip-skill-tile empty" aria-hidden="true"></div>
+        </div>
+        <div class="equip-level-frame" aria-label="角色升级">
+          <div class="equip-level-icon" aria-hidden="true"><span>Lv</span></div>
+          <div class="equip-level-frame-main">
+            <div class="equip-level-cost">${
+              atMaxLevel ? `Lv.${progress.level} · 已达上限` : `升级费用 · ● ${compact(levelCost)}`
+            }</div>
+            <button
+              type="button"
+              class="primary-button compact"
+              data-action="hero-level"
+              data-hero-id="${heroId}"
+              ${canLevelUp ? "" : "disabled"}
+            >升级</button>
           </div>
         </div>
-        ${itemStatsBlocks(item)}
-        ${
-          set
-            ? `<p class="trait-line">套装 · ${set.name}</p>`
-            : ""
-        }
-        ${
-          trait
-            ? `<p class="trait-line">传奇 · ${trait.name}<small>${trait.description}</small></p>`
-            : `<p class="trait-line muted">无传奇特效</p>`
-        }
-      </article>
+        <div class="equip-star-frame" aria-label="角色升星">
+          <div class="equip-fragment-icon" aria-hidden="true"><span>碎</span></div>
+          <div class="equip-star-frame-main">
+            <div class="equip-fragment-meter" role="progressbar" aria-label="角色碎片进度" aria-valuemin="0" aria-valuemax="${
+              atMaxStar ? 100 : needed
+            }" aria-valuenow="${atMaxStar ? 100 : have}">
+              <span class="equip-fragment-fill" style="width:${fillPct}%"></span>
+              <span class="equip-fragment-label">${
+                atMaxStar ? `碎片 ${have} · 满星` : `碎片 ${have}/${needed}`
+              }</span>
+            </div>
+            <button
+              type="button"
+              class="primary-button compact"
+              data-action="hero-star-up"
+              data-hero-id="${heroId}"
+              ${canStarUp ? "" : "disabled"}
+            >升星</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderSkillTips(heroId: HeroId): string {
+    const kind = this.equipSkillTipsKind;
+    if (!kind) return "";
+    const skill = kind === "active" ? ACTIVE_SKILL_BY_HERO[heroId] : PASSIVE_SKILL_BY_HERO[heroId];
+    const kindLabel = kind === "active" ? "主动技能" : "被动技能";
+    const cooldown =
+      kind === "active" && skill.cooldownMs != null
+        ? `${Math.round(skill.cooldownMs / 100) / 10}s`
+        : null;
+    return `
+      <div class="equip-tips-layer" role="presentation">
+        <div class="equip-tips-backdrop" data-action="close-equip-tips" aria-label="关闭技能详情"></div>
+        <section class="equip-tips-panel skill-tips" role="dialog" aria-modal="true" aria-label="${kindLabel}">
+          <button class="modal-close" data-action="close-equip-tips" aria-label="关闭">×</button>
+          <div class="equip-skill-tips-head">
+            <div class="equip-skill-icon large" aria-hidden="true"><span>${kind === "active" ? "技" : "被"}</span></div>
+            <div>
+              <small>${kindLabel}${cooldown ? ` · CD ${cooldown}` : ""}</small>
+              <h3>${skill.name}</h3>
+            </div>
+          </div>
+          <p class="equip-skill-tips-desc">${skill.description}</p>
+          ${
+            cooldown
+              ? `<p class="equip-skill-tips-cd">冷却时间 <b>${cooldown}</b></p>`
+              : `<p class="equip-skill-tips-cd muted">被动效果，无冷却</p>`
+          }
+        </section>
+      </div>
+    `;
+  }
+
+  private renderEquipTipsLayer(
+    state: GameStoreState,
+    equipped: InventoryItem | null,
+    selected: InventoryItem | null,
+    heroName: string,
+  ): string {
+    if (!this.equipTipsKind) return "";
+    if (this.equipTipsKind === "unequip") {
+      if (!equipped) return "";
+      return `
+        <div class="equip-slot-tips-host" role="presentation">
+          <aside class="equip-slot-tips ${rarityClass(equipped.rarity)}" role="dialog" aria-label="已装备详情">
+            <button type="button" class="equip-slot-tips-close" data-action="close-equip-tips" aria-label="关闭">×</button>
+            <span class="compare-label">已装备</span>
+            ${itemDetailSheet(equipped)}
+            <button type="button" class="secondary-button wide compact" data-action="unequip-item">卸下</button>
+          </aside>
+        </div>
+      `;
+    }
+    if (!selected) return "";
+    const currentScore = equipped ? getItemScore(equipped) : 0;
+    const nextScore = getItemScore(selected);
+    const alreadyEquipped = Boolean(equipped && equipped.instanceId === selected.instanceId);
+    const scoreDelta = nextScore - currentScore;
+    const summary = alreadyEquipped
+      ? "当前角色已装备此物"
+      : equipped
+        ? `战力 ${currentScore} → ${nextScore}${scoreDelta === 0 ? "" : `（${scoreDelta > 0 ? "+" : ""}${scoreDelta}）`}`
+        : `战力 ${nextScore} · 该槽位暂无装备`;
+    const summaryClass =
+      alreadyEquipped || scoreDelta === 0 || !equipped ? "" : scoreDelta > 0 ? "upgrade" : "downgrade";
+    return `
+      <div class="equip-tips-layer" role="presentation">
+        <div class="equip-tips-backdrop" data-action="close-equip-tips" aria-label="关闭装备对比"></div>
+        <section class="equip-tips-panel compare" role="dialog" aria-modal="true" aria-label="装备对比">
+          <div class="equip-tips-board">
+            ${this.renderCompareCard(equipped, "已装备", "current")}
+            ${this.renderCompareCard(selected, "未装备", "selected")}
+          </div>
+          <p class="equip-compare-summary ${summaryClass}">${summary}</p>
+          <div class="equip-tips-actions">
+            ${
+              alreadyEquipped
+                ? `<button type="button" class="secondary-button wide" data-action="unequip-item">卸下</button>`
+                : `<button type="button" class="primary-button wide" data-action="equip-item">装备到 ${heroName}</button>`
+            }
+          </div>
+        </section>
+      </div>
     `;
   }
 
@@ -649,44 +953,35 @@ export class AppShell {
       this.closeModal();
       return;
     }
-    const definition = ITEM_BY_ID[item.definitionId]!;
-    const trait = item.traitId ? TRAIT_BY_ID[item.traitId] : null;
-    const set = definition.setId ? SET_BY_ID[definition.setId] : null;
-    const schoolLabel = definition.school === "magic" ? "法系" : "物理";
     const salvageGold = getSalvageGold(item);
+    const fromAlchemy = this.itemTipsSource === "alchemy";
+    const inCube = fromAlchemy && this.alchemySlots.includes(item.instanceId);
+    const actions = fromAlchemy
+      ? `
+        <div class="item-tips-actions">
+          <button class="secondary-button" data-action="item-salvage">分解 · ● ${compact(salvageGold)}</button>
+          <button class="primary-button" data-action="${inCube ? "alchemy-item-remove" : "alchemy-item-put"}">
+            ${inCube ? "取出" : "放入"}
+          </button>
+        </div>`
+      : `
+        <div class="item-tips-actions">
+          <button class="secondary-button" data-action="item-salvage">分解 · ● ${compact(salvageGold)}</button>
+          <button class="primary-button" data-action="item-open-equip">装备</button>
+        </div>`;
     this.overlay.innerHTML = `
       <div class="modal-backdrop" data-action="close-modal"></div>
       <section class="item-tips-modal ${rarityClass(item.rarity)}" role="dialog" aria-modal="true" aria-label="装备详情">
         <button class="modal-close" data-action="close-modal" aria-label="关闭">×</button>
-        <div class="item-tips-head">
-          <div class="detail-icon item-tips-icon">${equipmentArt(definition.icon)}</div>
-          <div>
-            <span class="rarity-label">${RARITY_LABELS[item.rarity]} · ${slotLabel[item.slot]} · ${schoolLabel}</span>
-            <h2>${definition.name}</h2>
-            <p class="equip-power">战力 ${getItemScore(item)}</p>
-          </div>
-        </div>
-        <div class="item-tips-stats">${itemStatsBlocks(item)}</div>
-        ${
-          set
-            ? `<p class="trait-line">套装 · ${set.name}<small>同套 2/4/6 件激活加成</small></p>`
-            : ""
-        }
-        ${
-          trait
-            ? `<p class="trait-line">传奇 · ${trait.name}<small>${trait.description}</small></p>`
-            : `<p class="trait-line muted">无传奇特效</p>`
-        }
-        <div class="item-tips-actions">
-          <button class="secondary-button" data-action="item-salvage">分解 · ● ${compact(salvageGold)}</button>
-          <button class="primary-button" data-action="item-open-equip">装备</button>
-        </div>
+        ${itemDetailSheet(item)}
+        ${actions}
       </section>
     `;
   }
 
   private equipCandidates(state: GameStoreState): InventoryItem[] {
-    return [...state.save.inventory]
+    const equipped = this.equippedInstanceIds(state);
+    return backpackItems(state.save.inventory, equipped)
       .filter((item) => item.slot === this.equipFocusSlot)
       .sort(compareInventoryItems);
   }
@@ -700,21 +995,8 @@ export class AppShell {
     ) {
       return current;
     }
-
-    const equippedId = state.save.roster[this.equipTargetHeroId]?.equipment[this.equipFocusSlot];
-    if (equippedId) {
-      const equipped = state.save.inventory.find(({ instanceId }) => instanceId === equippedId);
-      if (equipped) {
-        this.selectedItemId = equipped.instanceId;
-        return equipped;
-      }
-    }
-
-    const first = this.equipCandidates(state).find(
-      (item) => !this.isOwnedByOtherHero(state, item.instanceId),
-    );
-    this.selectedItemId = first?.instanceId ?? null;
-    return first ?? null;
+    this.selectedItemId = null;
+    return null;
   }
 
   private renderCandidateCard(state: GameStoreState, item: InventoryItem): string {
@@ -745,68 +1027,70 @@ export class AppShell {
   }
 
   private syncEquipModal(state: GameStoreState): void {
-    const party = this.partyHeroIds(state);
-    if (party.length && !party.includes(this.equipTargetHeroId)) {
-      this.equipTargetHeroId = party[0]!;
+    const targetProgress = state.save.roster[this.equipTargetHeroId];
+    if (!targetProgress?.unlocked) {
+      const party = this.partyHeroIds(state);
+      this.equipTargetHeroId = party[0] ?? this.selectedHeroId;
     }
     const candidates = this.equipCandidates(state);
     const item = this.resolveSelectedEquipItem(state);
-    if (!item && candidates.length === 0) {
-      this.closeModal();
-      return;
-    }
-    const focusSlot = item?.slot ?? this.equipFocusSlot;
+    const focusSlot = this.equipFocusSlot;
     const heroId = this.equipTargetHeroId;
     const hero = HERO_BY_ID[heroId];
     const progress = state.save.roster[heroId];
     const equippedId = progress.equipment[focusSlot];
     const equipped = equippedId
-      ? state.save.inventory.find(({ instanceId }) => instanceId === equippedId)
+      ? state.save.inventory.find(({ instanceId }) => instanceId === equippedId) ?? null
       : null;
-    const nextScore = item ? getItemScore(item) : 0;
-    const currentScore = equipped ? getItemScore(equipped) : 0;
-    const alreadyEquipped = Boolean(item && equippedId === item.instanceId);
-    const scoreDelta = item ? nextScore - currentScore : 0;
+
+    if (this.equipTipsKind === "compare" && !item) this.equipTipsKind = null;
+    if (this.equipTipsKind === "unequip" && !equipped) this.equipTipsKind = null;
+    if (this.equipTipsKind === "skill" && this.equipPanelTab !== "stats") {
+      this.equipTipsKind = null;
+      this.equipSkillTipsKind = null;
+    }
+
     const portrait = ASSET_MANIFEST.characters[heroId];
-    const summary = !item
-      ? "请选择一件可装备的道具"
-      : alreadyEquipped
-        ? "当前角色已装备此物，可卸下"
-        : `战力 ${currentScore} → ${nextScore}${scoreDelta === 0 ? "" : `（${scoreDelta > 0 ? "+" : ""}${scoreDelta}）`}`;
-    const actionLabel = alreadyEquipped ? "卸下" : `装备到 ${hero.name}`;
 
     let modal = this.overlay.querySelector<HTMLElement>(".character-equip-modal");
     if (!modal) {
       this.overlay.innerHTML = `
         <div class="modal-backdrop" data-action="close-modal"></div>
-        <section class="equip-modal character-equip-modal" role="dialog" aria-modal="true" aria-label="更换装备">
+        <section class="equip-modal character-equip-modal" role="dialog" aria-modal="true" aria-label="英雄属性">
           <header class="character-equip-header">
-            <h2>更换装备</h2>
+            <h2>英雄属性</h2>
             <button class="modal-close" data-action="close-modal" aria-label="关闭">×</button>
           </header>
           ${this.renderEquipPartyStrip(state)}
-          <div class="character-loadout">
-            <section class="character-loadout-col gear" aria-label="装备栏">
-              <div class="equip-slot-grid gear"></div>
-            </section>
-            <div class="character-portrait-stage">
-              <img class="character-portrait-art" alt="" />
-              <div class="character-portrait-meta">
-                <strong></strong>
-                <small></small>
+          <div class="equip-panel-tabs-host"></div>
+          <div class="equip-panel-body">
+            <div class="character-loadout">
+              <section class="character-loadout-col left" aria-label="左侧栏">
+                <div class="equip-slot-grid gear"></div>
+                <div class="equip-stats-col left" hidden></div>
+              </section>
+              <div class="character-portrait-stage">
+                <img class="character-portrait-art" alt="" />
+                <div class="character-portrait-meta">
+                  <span class="character-portrait-stars" aria-label="星级"></span>
+                  <strong></strong>
+                  <small></small>
+                </div>
               </div>
+              <section class="character-loadout-col right" aria-label="右侧栏">
+                <div class="equip-slot-grid accessories"></div>
+                <div class="equip-stats-col right" hidden></div>
+              </section>
             </div>
-            <section class="character-loadout-col accessories" aria-label="饰品栏">
-              <div class="equip-slot-grid accessories"></div>
-            </section>
+            <div class="equip-bottom-host">
+              <div class="equip-candidate-section">
+                <small class="equip-candidate-label"></small>
+                <div class="equip-candidate-grid item-grid" aria-label="可选装备"></div>
+              </div>
+              <div class="equip-skill-host" hidden></div>
+            </div>
           </div>
-          <div class="equip-compare-board" aria-label="装备对比"></div>
-          <p class="equip-compare-summary"></p>
-          <div class="equip-candidate-section">
-            <small class="equip-candidate-label"></small>
-            <div class="equip-candidate-grid item-grid" aria-label="可选装备"></div>
-          </div>
-          <button class="primary-button wide" data-action="equip-item"></button>
+          <div class="equip-tips-host"></div>
         </section>
       `;
       modal = this.overlay.querySelector<HTMLElement>(".character-equip-modal")!;
@@ -814,25 +1098,55 @@ export class AppShell {
       if (createdGrid) bindDragScroll(createdGrid);
     }
 
+    const tabsHost = modal.querySelector(".equip-panel-tabs-host");
+    if (tabsHost) tabsHost.innerHTML = this.renderEquipPanelTabs();
+
     for (const plate of modal.querySelectorAll<HTMLElement>(".equip-party-strip .nameplate[data-hero-id]")) {
       const selected = plate.dataset.heroId === heroId;
       plate.classList.toggle("selected", selected);
       plate.setAttribute("aria-pressed", selected ? "true" : "false");
     }
 
-    const gearGrid = modal.querySelector(".equip-slot-grid.gear");
-    const accessoryGrid = modal.querySelector(".equip-slot-grid.accessories");
+    const showGear = this.equipPanelTab === "gear";
+    const gearGrid = modal.querySelector<HTMLElement>(".equip-slot-grid.gear");
+    const accessoryGrid = modal.querySelector<HTMLElement>(".equip-slot-grid.accessories");
+    const statsLeft = modal.querySelector<HTMLElement>(".equip-stats-col.left");
+    const statsRight = modal.querySelector<HTMLElement>(".equip-stats-col.right");
+    const candidateSection = modal.querySelector<HTMLElement>(".equip-candidate-section");
+    const skillHost = modal.querySelector<HTMLElement>(".equip-skill-host");
+    const statsContent = showGear ? null : this.getEquipStatsContent(state, heroId);
+
     if (gearGrid) {
-      gearGrid.innerHTML = GEAR_SLOTS.map((slot) => this.renderEquipSlot(state, heroId, slot, focusSlot)).join("");
+      gearGrid.hidden = !showGear;
+      if (showGear) {
+        gearGrid.innerHTML = GEAR_SLOTS.map((slot) => this.renderEquipSlot(state, heroId, slot, focusSlot)).join("");
+      }
     }
     if (accessoryGrid) {
-      accessoryGrid.innerHTML = ACCESSORY_SLOTS.map((slot) =>
-        this.renderEquipSlot(state, heroId, slot, focusSlot),
-      ).join("");
+      accessoryGrid.hidden = !showGear;
+      if (showGear) {
+        accessoryGrid.innerHTML = ACCESSORY_SLOTS.map((slot) =>
+          this.renderEquipSlot(state, heroId, slot, focusSlot),
+        ).join("");
+      }
+    }
+    if (statsLeft) {
+      statsLeft.hidden = showGear;
+      statsLeft.innerHTML = statsContent?.leftHtml ?? "";
+    }
+    if (statsRight) {
+      statsRight.hidden = showGear;
+      statsRight.innerHTML = statsContent?.rightHtml ?? "";
+    }
+    if (candidateSection) candidateSection.hidden = !showGear;
+    if (skillHost) {
+      skillHost.hidden = showGear;
+      skillHost.innerHTML = statsContent?.skillsHtml ?? "";
     }
 
     const portraitStage = modal.querySelector<HTMLElement>(".character-portrait-stage");
     const portraitArt = modal.querySelector<HTMLImageElement>(".character-portrait-art");
+    const portraitStars = modal.querySelector(".character-portrait-stars");
     const portraitName = modal.querySelector(".character-portrait-meta strong");
     const portraitMeta = modal.querySelector(".character-portrait-meta small");
     if (portraitStage) portraitStage.style.setProperty("--hero-color", hero.color);
@@ -840,41 +1154,31 @@ export class AppShell {
       if (portraitArt.getAttribute("src") !== portrait) portraitArt.src = portrait;
       portraitArt.alt = hero.name;
     }
+    if (portraitStars) {
+      portraitStars.textContent =
+        "★".repeat(progress.stars) + "☆".repeat(MAX_HERO_STARS - progress.stars);
+    }
     if (portraitName) portraitName.textContent = hero.name;
     if (portraitMeta) portraitMeta.textContent = `${hero.role} · Lv.${progress.level}`;
 
-    const compareBoard = modal.querySelector(".equip-compare-board");
-    if (compareBoard) {
-      compareBoard.innerHTML = `
-        ${this.renderCompareCard(equipped ?? null, "当前装备", "current")}
-        ${this.renderCompareCard(item, "所选装备", "selected")}
-      `;
-    }
-
-    const summaryEl = modal.querySelector(".equip-compare-summary");
-    if (summaryEl) {
-      summaryEl.className = `equip-compare-summary ${
-        !item ? "" : scoreDelta > 0 ? "upgrade" : scoreDelta < 0 ? "downgrade" : ""
-      }`;
-      summaryEl.textContent = summary;
-    }
-
     const candidateLabel = modal.querySelector(".equip-candidate-label");
-    if (candidateLabel) candidateLabel.textContent = `可选装备 · ${slotLabel[focusSlot]}`;
+    if (candidateLabel && showGear) candidateLabel.textContent = `可选装备 · ${slotLabel[focusSlot]}`;
     const candidateGrid = modal.querySelector(".equip-candidate-grid");
-    if (candidateGrid) {
+    if (candidateGrid && showGear) {
       candidateGrid.innerHTML = candidates.length
         ? candidates.map((candidate) => this.renderCandidateCard(state, candidate)).join("")
         : `<div class="equip-candidate-empty">该槽位暂无可选装备</div>`;
     }
 
-    const actionButton = modal.querySelector<HTMLButtonElement>('[data-action="equip-item"], [data-action="unequip-item"]');
-    if (actionButton) {
-      actionButton.dataset.action = alreadyEquipped ? "unequip-item" : "equip-item";
-      actionButton.disabled = !item || !party.length;
-      actionButton.textContent = actionLabel;
-      actionButton.classList.toggle("secondary-button", alreadyEquipped);
-      actionButton.classList.toggle("primary-button", !alreadyEquipped);
+    const tipsHost = modal.querySelector(".equip-tips-host");
+    if (tipsHost) {
+      if (this.equipTipsKind === "skill") {
+        tipsHost.innerHTML = this.renderSkillTips(heroId);
+      } else if (showGear) {
+        tipsHost.innerHTML = this.renderEquipTipsLayer(state, equipped, item, hero.name);
+      } else {
+        tipsHost.innerHTML = "";
+      }
     }
   }
 
@@ -898,12 +1202,10 @@ export class AppShell {
               </button>
             </article>`;
           }
-          const definition = ITEM_BY_ID[offer.item.definitionId]!;
-          return `<article class="shop-card ${rarityClass(offer.item.rarity)} ${offer.sold ? "sold" : ""}">
-            <span class="offer-art">${equipmentArt(definition.icon)}</span><small>${RARITY_LABELS[offer.item.rarity]} · ${slotLabel[offer.item.slot]}</small>
-            <strong>${definition.name}</strong><em>${itemStats(offer.item)}</em>
+          return `<article class="shop-card equipment-offer ${rarityClass(offer.item.rarity)} ${offer.sold ? "sold" : ""}">
+            ${itemDetailSheet(offer.item)}
             <button data-action="shop-buy" data-offer-id="${offer.offerId}" ${offer.sold || state.save.gold < offer.priceGold ? "disabled" : ""}>
-              ${offer.sold ? "已售罄" : `● ${compact(offer.priceGold)}`}
+              ${offer.sold ? "已售罄" : `购买 · ● ${compact(offer.priceGold)}`}
             </button>
           </article>`;
         }).join("")}
@@ -912,41 +1214,34 @@ export class AppShell {
   }
 
   private renderHeroes(state: GameStoreState): void {
-    const selected = HERO_BY_ID[this.selectedHeroId];
-    const progress = state.save.roster[this.selectedHeroId];
-    const stats = getHeroStats(this.selectedHeroId, progress.level);
-    const active = ACTIVE_SKILL_BY_HERO[this.selectedHeroId];
-    const passive = PASSIVE_SKILL_BY_HERO[this.selectedHeroId];
-    const cost = getUpgradeCost(progress.level);
     const unlockedCount = Object.values(state.save.roster).filter(({ unlocked }) => unlocked).length;
     this.content.innerHTML = `
       <div class="panel-heading compact" data-panel="heroes">
         <span class="panel-meta" aria-label="已解锁英雄">${unlockedCount}/8</span>
         <div class="panel-actions">
-          <button class="summon-entry" data-action="summon-open">召唤</button>
+          <button class="summon-entry" data-action="summon-open" aria-label="召唤英雄">召唤</button>
         </div>
       </div>
-      <div class="hero-roster">
+      <div class="hero-card-grid" role="list">
         ${HERO_DEFINITIONS.map((hero) => {
-          const unlocked = state.save.roster[hero.id].unlocked;
-          return `<button class="hero-token ${this.selectedHeroId === hero.id ? "selected" : ""} ${unlocked ? "" : "locked"}" data-action="${unlocked ? "hero-detail" : "summon-open"}" data-hero-id="${hero.id}" aria-label="${unlocked ? hero.name : `${hero.name}未解锁`}">
-            <span style="--hero-color:${hero.color}">${unlocked ? hero.name.slice(0, 1) : "?"}</span>
-            <small>${unlocked ? hero.name : "未解锁"}</small>
+          const heroProgress = state.save.roster[hero.id];
+          const unlocked = heroProgress.unlocked;
+          const portrait = ASSET_MANIFEST.characters[hero.id];
+          const stars =
+            "★".repeat(heroProgress.stars) + "☆".repeat(MAX_HERO_STARS - heroProgress.stars);
+          return `<button class="hero-card ${this.selectedHeroId === hero.id ? "selected" : ""} ${unlocked ? "" : "locked"}" data-action="${unlocked ? "hero-detail" : "summon-open"}" data-hero-id="${hero.id}" role="listitem" aria-label="${unlocked ? `${hero.name} ${hero.role} Lv.${heroProgress.level}` : `${hero.name}未解锁`}" aria-pressed="${this.selectedHeroId === hero.id ? "true" : "false"}">
+            <div class="hero-card-art" style="--hero-color:${hero.color}">
+              <img src="${portrait}" alt="" draggable="false" />
+            </div>
+            <span class="hero-card-stars" aria-label="星级 ${heroProgress.stars}">${unlocked ? stars : "☆☆☆☆☆"}</span>
+            <strong class="hero-card-name">${hero.name}</strong>
+            <span class="hero-card-meta">
+              <span class="hero-card-role">${hero.role}</span>
+              <span class="hero-card-level">${unlocked ? `Lv.${heroProgress.level}` : "未解锁"}</span>
+            </span>
           </button>`;
         }).join("")}
       </div>
-      <article class="hero-detail">
-        <header><div class="hero-portrait" style="--hero-color:${selected.color}">${selected.name.slice(0, 1)}</div>
-          <div><small>${selected.role}</small><h3>${selected.name} <em>Lv.${progress.level}</em></h3><p>${selected.tagline}</p></div></header>
-        <div class="stat-row"><span>生命 <b>${stats.maxHp}</b></span><span>攻击 <b>${stats.attack}</b></span><span>防御 <b>${stats.defense}</b></span></div>
-        <div class="skill-list">
-          <div><i>主动</i><strong>${active.name}</strong><p>${active.description}</p></div>
-          <div><i>被动</i><strong>${passive.name}</strong><p>${passive.description}</p></div>
-        </div>
-        <button class="primary-button wide" data-action="hero-level" data-hero-id="${selected.id}" ${progress.level >= 20 || state.save.gold < cost ? "disabled" : ""}>
-          ${progress.level >= 20 ? "已达等级上限" : `升级 · ● ${compact(cost)}`}
-        </button>
-      </article>
     `;
   }
 
@@ -1020,9 +1315,6 @@ export class AppShell {
     if (this.alchemyPreviewId && !candidates.some((item) => item.instanceId === this.alchemyPreviewId)) {
       this.alchemyPreviewId = null;
     }
-    const preview = this.alchemyPreviewId
-      ? state.save.inventory.find(({ instanceId }) => instanceId === this.alchemyPreviewId) ?? null
-      : null;
 
     this.content.innerHTML = `
       <div class="alchemy-page" data-panel="alchemy">
@@ -1063,7 +1355,7 @@ export class AppShell {
                         const definition = ITEM_BY_ID[item.definitionId]!;
                         const inCube = this.alchemySlots.includes(item.instanceId);
                         const previewing = this.alchemyPreviewId === item.instanceId;
-                        return `<button type="button" class="item-card ${rarityClass(item.rarity)} ${inCube ? "selected" : ""} ${previewing ? "alchemy-previewing" : ""}" data-action="alchemy-list-toggle" data-item-id="${item.instanceId}" aria-label="${RARITY_LABELS[item.rarity]}${definition.name}">
+                        return `<button type="button" class="item-card ${rarityClass(item.rarity)} ${inCube ? "selected" : ""} ${previewing ? "alchemy-previewing" : ""}" data-action="alchemy-item-detail" data-item-id="${item.instanceId}" aria-label="${RARITY_LABELS[item.rarity]}${definition.name}">
                           <span class="item-icon" aria-hidden="true">${equipmentArt(definition.icon)}</span>
                         </button>`;
                       })
@@ -1075,19 +1367,7 @@ export class AppShell {
         </div>
       </div>
     `;
-    this.alchemyTipsHost.innerHTML = preview
-      ? `<div class="alchemy-tips-layer">
-        <section class="alchemy-tips" role="status" aria-label="装备详情">
-          <div class="alchemy-tips-icon detail-icon ${rarityClass(preview.rarity)}">${equipmentArt(ITEM_BY_ID[preview.definitionId]!.icon)}</div>
-          <div class="alchemy-tips-body">
-            <span class="rarity-label">${RARITY_LABELS[preview.rarity]} · ${slotLabel[preview.slot]} · ${ITEM_BY_ID[preview.definitionId]!.school === "magic" ? "法系" : "物理"}</span>
-            <strong>${ITEM_BY_ID[preview.definitionId]!.name}</strong>
-            <p class="equip-power">战力 ${getItemScore(preview)}</p>
-            <div class="alchemy-tips-stats">${itemStatsBlocks(preview)}</div>
-          </div>
-        </section>
-      </div>`
-      : "";
+    this.alchemyTipsHost.innerHTML = "";
     const list = this.content.querySelector<HTMLElement>('[data-scroll="alchemy"]');
     if (list) bindDragScroll(list);
   }
@@ -1130,14 +1410,38 @@ export class AppShell {
         <button class="primary-button wide" data-action="formation-save">保存并重新挑战</button>
       `);
     } else if (this.modal === "summon") {
-      const summonResult = this.summonResultHero ? HERO_BY_ID[this.summonResultHero] : null;
+      const results = this.summonResults;
+      const hasResults = Boolean(results?.length);
+      const unlockedCount = results?.filter((pull) => pull.kind === "unlock").length ?? 0;
+      const title = !hasResults
+        ? "英雄召唤"
+        : unlockedCount === results!.length
+          ? "新英雄加入"
+          : unlockedCount > 0
+            ? "召唤结果"
+            : "获得印记";
       this.overlay.innerHTML = `
-        <div class="modal-backdrop"></div><section class="full-modal summon-modal" role="dialog" aria-modal="true">
+        <div class="modal-backdrop"></div><section class="full-modal summon-modal" role="dialog" aria-modal="true" aria-label="${title}" ${hasResults ? 'data-action="close-modal"' : ""}>
           <button class="modal-close" data-action="close-modal" aria-label="关闭">×</button>
-          <small>${summonResult ? "星辉回应" : "星辉之门"}</small><h2>${summonResult ? "新英雄加入" : "英雄召唤"}</h2>
+          <small>${hasResults ? "星辉回应" : "星辉之门"}</small><h2>${title}</h2>
           ${
-            summonResult
-              ? `<div class="summon-result" style="--hero-color:${summonResult.color}"><div>${summonResult.name.slice(0, 1)}</div><h3>${summonResult.name} · ${summonResult.role}</h3><p>${summonResult.tagline}</p><strong>${ACTIVE_SKILL_BY_HERO[summonResult.id].name}</strong></div>`
+            hasResults
+              ? `<div class="summon-result-grid count-${results!.length}" aria-label="召唤获得">
+                  ${results!
+                    .map((pull, index) => {
+                      const hero = HERO_BY_ID[pull.heroId];
+                      const portrait = ASSET_MANIFEST.characters[pull.heroId];
+                      const badge = pull.kind === "unlock" ? "新英雄" : `+${pull.marks} 印记`;
+                      return `<article class="summon-result ${pull.kind}" style="--hero-color:${hero.color}; --reveal-delay:${index * 60}ms">
+                        <div class="summon-result-art"><img src="${portrait}" alt="" draggable="false" /></div>
+                        <h3>${hero.name}</h3>
+                        <small>${hero.role}</small>
+                        <strong>${badge}</strong>
+                      </article>`;
+                    })
+                    .join("")}
+                </div>
+                <p class="summon-dismiss-hint">点击空白处返回</p>`
               : `<div class="summon-orb"><span>✦</span></div><p>首次有效召唤固定解锁塞拉，第二次固定解锁海泽。之后重复英雄转为 20 印记。</p>`
           }
           <div class="summon-actions">
@@ -1198,17 +1502,6 @@ export class AppShell {
     const target = origin?.closest?.<HTMLElement>("[data-action]") ?? null;
     const action = target?.dataset.action;
 
-    if (this.alchemyPreviewId && action !== "alchemy-list-toggle") {
-      this.alchemyPreviewId = null;
-      this.alchemyTipsHost.innerHTML = "";
-      if (!action) {
-        if (this.store.getState().ui.activeTab === "alchemy") {
-          this.renderAlchemy(this.store.getState());
-        }
-        return;
-      }
-    }
-
     if (!target || !action) return;
     this.options.onSoundRequested?.("button");
     if (action === "select-tab") this.store.dispatch({ type: "ui:selectTab", tab: target.dataset.tab as keyof typeof tabMeta });
@@ -1219,39 +1512,62 @@ export class AppShell {
       const picked = pickAlchemyAutoFill(candidates);
       this.alchemySlots = Array.from({ length: ALCHEMY_SLOT_COUNT }, (_, index) => picked[index] ?? null);
       this.alchemyPreviewId = null;
+      this.alchemyTipsHost.innerHTML = "";
       this.renderAlchemy(state);
     } else if (action === "alchemy-clear") {
       this.alchemySlots = Array.from({ length: ALCHEMY_SLOT_COUNT }, () => null);
       this.alchemyPreviewId = null;
+      this.alchemyTipsHost.innerHTML = "";
       this.renderAlchemy(this.store.getState());
     } else if (action === "alchemy-slot-clear") {
       const slot = Number(target.dataset.slot);
       if (!Number.isInteger(slot) || slot < 0 || slot >= ALCHEMY_SLOT_COUNT) return;
       this.alchemySlots[slot] = null;
       this.alchemyPreviewId = null;
+      this.alchemyTipsHost.innerHTML = "";
       this.renderAlchemy(this.store.getState());
-    } else if (action === "alchemy-list-toggle") {
+    } else if (action === "alchemy-item-detail") {
       const itemId = target.dataset.itemId;
       if (!itemId) return;
-      const existing = this.alchemySlots.indexOf(itemId);
-      if (existing >= 0) {
-        this.alchemySlots[existing] = null;
-      } else {
-        const empty = this.alchemySlots.indexOf(null);
-        if (empty < 0) {
-          this.showToast("魔方已满");
-        } else {
-          this.alchemySlots[empty] = itemId;
-        }
-      }
       this.alchemyPreviewId = itemId;
+      this.selectedItemId = itemId;
+      this.itemTipsSource = "alchemy";
       this.renderAlchemy(this.store.getState());
+      this.openModal("item-tips");
+    } else if (action === "alchemy-item-put") {
+      const itemId = this.selectedItemId;
+      if (!itemId) return;
+      if (this.alchemySlots.includes(itemId)) {
+        this.showToast("已在魔方中");
+        return;
+      }
+      const empty = this.alchemySlots.indexOf(null);
+      if (empty < 0) {
+        this.showToast("魔方已满");
+        return;
+      }
+      this.alchemySlots[empty] = itemId;
+      this.alchemyPreviewId = itemId;
+      this.closeModal();
+      this.renderAlchemy(this.store.getState());
+      this.showToast("已放入魔方");
+    } else if (action === "alchemy-item-remove") {
+      const itemId = this.selectedItemId;
+      if (!itemId) return;
+      const index = this.alchemySlots.indexOf(itemId);
+      if (index < 0) return;
+      this.alchemySlots[index] = null;
+      this.alchemyPreviewId = itemId;
+      this.closeModal();
+      this.renderAlchemy(this.store.getState());
+      this.showToast("已从魔方取出");
     } else if (action === "alchemy-craft") {
       const itemIds = this.alchemySlots.filter((id): id is string => Boolean(id));
       if (itemIds.length !== ALCHEMY_SLOT_COUNT) return;
       this.store.dispatch({ type: "alchemy:craft", itemIds });
       this.alchemySlots = Array.from({ length: ALCHEMY_SLOT_COUNT }, () => null);
       this.alchemyPreviewId = null;
+      this.alchemyTipsHost.innerHTML = "";
     } else if (action === "toggle-speed") this.store.dispatch({ type: "battle:setSpeed", speed: this.store.getState().save.settings.battleSpeed === 1 ? 2 : 1 });
     else if (action === "settings") this.openModal("settings");
     else if (action === "currency-info") {
@@ -1260,6 +1576,7 @@ export class AppShell {
     } else if (action === "close-modal") this.closeModal();
     else if (action === "item-detail") {
       this.selectedItemId = target.dataset.itemId ?? null;
+      this.itemTipsSource = "inventory";
       const tipItem = this.store.getState().save.inventory.find(({ instanceId }) => instanceId === this.selectedItemId);
       if (tipItem) this.equipFocusSlot = tipItem.slot;
       this.equipTargetHeroId = this.pickEquipTargetHero(this.store.getState());
@@ -1304,23 +1621,52 @@ export class AppShell {
       this.showToast(gained > 0 ? `分解获得 ● ${gained}` : "没有可分解的装备");
     } else if (action === "item-salvage") {
       if (!this.selectedItemId) return;
-      const item = this.store.getState().save.inventory.find(({ instanceId }) => instanceId === this.selectedItemId);
+      const itemId = this.selectedItemId;
+      const item = this.store.getState().save.inventory.find(({ instanceId }) => instanceId === itemId);
       const gold = item ? getSalvageGold(item) : 0;
-      this.store.dispatch({ type: "item:salvage", itemId: this.selectedItemId });
+      this.alchemySlots = this.alchemySlots.map((id) => (id === itemId ? null : id));
+      this.store.dispatch({ type: "item:salvage", itemId });
       this.selectedItemId = null;
+      this.alchemyPreviewId = null;
       this.closeModal();
+      if (this.store.getState().ui.activeTab === "alchemy") {
+        this.renderAlchemy(this.store.getState());
+      }
       if (gold > 0) this.showToast(`分解获得 ● ${gold}`);
     } else if (action === "item-open-equip") {
       const tipItem = this.store.getState().save.inventory.find(({ instanceId }) => instanceId === this.selectedItemId);
       if (!tipItem) return this.closeModal();
       this.equipFocusSlot = tipItem.slot;
       this.equipTargetHeroId = this.pickEquipTargetHero(this.store.getState());
+      this.equipPanelTab = "gear";
+      this.equipTipsKind = null;
+      this.equipSkillTipsKind = null;
       this.openModal("equip");
+    } else if (action === "equip-panel-tab") {
+      const tab = target.dataset.tab === "stats" ? "stats" : "gear";
+      if (tab === this.equipPanelTab) return;
+      this.equipPanelTab = tab;
+      this.equipTipsKind = null;
+      this.equipSkillTipsKind = null;
+      this.syncEquipModal(this.store.getState());
+    } else if (action === "close-equip-tips") {
+      this.equipTipsKind = null;
+      this.equipSkillTipsKind = null;
+      this.syncEquipModal(this.store.getState());
+    } else if (action === "equip-skill-tips") {
+      const kind = target.dataset.skillKind === "passive" ? "passive" : "active";
+      this.equipPanelTab = "stats";
+      this.equipTipsKind = "skill";
+      this.equipSkillTipsKind = kind;
+      this.syncEquipModal(this.store.getState());
     } else if (action === "equip-hero-select") {
       const heroId = target.dataset.heroId as HeroId | undefined;
       if (!heroId || !this.partyHeroIds(this.store.getState()).includes(heroId)) return;
       if (heroId === this.equipTargetHeroId) return;
       this.equipTargetHeroId = heroId;
+      this.equipTipsKind = null;
+      this.equipSkillTipsKind = null;
+      this.selectedItemId = null;
       this.syncEquipModal(this.store.getState());
     } else if (action === "equip-slot-focus") {
       const slot = target.dataset.slot as EquipmentSlot | undefined;
@@ -1328,33 +1674,62 @@ export class AppShell {
       this.equipFocusSlot = slot;
       const equippedId = this.store.getState().save.roster[this.equipTargetHeroId]?.equipment[slot];
       this.selectedItemId = equippedId ?? null;
+      this.equipTipsKind = equippedId ? "unequip" : null;
+      this.equipSkillTipsKind = null;
+      this.equipPanelTab = "gear";
       this.syncEquipModal(this.store.getState());
     } else if (action === "equip-candidate-select") {
       const itemId = target.dataset.itemId;
-      if (!itemId || itemId === this.selectedItemId) return;
-      if (this.isOwnedByOtherHero(this.store.getState(), itemId)) return;
+      if (!itemId || this.isOwnedByOtherHero(this.store.getState(), itemId)) return;
       this.selectedItemId = itemId;
+      this.equipTipsKind = "compare";
+      this.equipSkillTipsKind = null;
       this.syncEquipModal(this.store.getState());
     } else if (action === "equip-item") {
       const heroId = this.equipTargetHeroId;
       if (!this.selectedItemId) return;
       if (this.isOwnedByOtherHero(this.store.getState(), this.selectedItemId)) return;
+      this.equipTipsKind = null;
+      this.equipSkillTipsKind = null;
       this.store.dispatch({ type: "item:equip", heroId, itemId: this.selectedItemId });
       this.showToast(`已装备到 ${HERO_BY_ID[heroId].name}`);
+      this.syncEquipModal(this.store.getState());
     } else if (action === "unequip-item") {
       const heroId = this.equipTargetHeroId;
-      if (!this.selectedItemId) return;
-      this.store.dispatch({ type: "item:unequip", heroId, itemId: this.selectedItemId });
+      const unequipId =
+        this.selectedItemId ??
+        this.store.getState().save.roster[heroId]?.equipment[this.equipFocusSlot] ??
+        null;
+      if (!unequipId) return;
+      this.selectedItemId = null;
+      this.equipTipsKind = null;
+      this.equipSkillTipsKind = null;
+      this.store.dispatch({ type: "item:unequip", heroId, itemId: unequipId });
       this.showToast("已卸下装备");
       this.syncEquipModal(this.store.getState());
     } else if (action === "shop-buy") this.store.dispatch({ type: "shop:buy", offerId: target.dataset.offerId! });
     else if (action === "shop-refresh") this.store.dispatch({ type: "shop:refresh" });
     else if (action === "hero-detail") {
-      this.selectedHeroId = target.dataset.heroId as HeroId;
-      this.renderPanel(this.store.getState());
-    } else if (action === "hero-level") this.store.dispatch({ type: "hero:levelUp", heroId: target.dataset.heroId as HeroId });
+      const heroId = target.dataset.heroId as HeroId | undefined;
+      if (!heroId || !this.store.getState().save.roster[heroId]?.unlocked) return;
+      this.selectedHeroId = heroId;
+      this.equipTargetHeroId = heroId;
+      this.equipPanelTab = "stats";
+      this.equipTipsKind = null;
+      this.equipSkillTipsKind = null;
+      this.selectedItemId = null;
+      this.openModal("equip");
+    } else if (action === "hero-level") {
+      this.store.dispatch({ type: "hero:levelUp", heroId: target.dataset.heroId as HeroId });
+      if (this.modal === "equip") this.syncEquipModal(this.store.getState());
+    } else if (action === "hero-star-up") {
+      const heroId = target.dataset.heroId as HeroId | undefined;
+      if (!heroId) return;
+      this.store.dispatch({ type: "hero:starUp", heroId });
+      if (this.modal === "equip") this.syncEquipModal(this.store.getState());
+    }
     else if (action === "summon-open") {
-      this.summonResultHero = null;
+      this.summonResults = null;
       this.openModal("summon");
     }
     else if (action === "summon-single") this.store.dispatch({ type: "summon:single" });
@@ -1427,10 +1802,25 @@ export class AppShell {
     for (const event of events) {
       if (event.type === "toast") this.showToast(event.message);
       if (event.type === "hero:leveled") this.showToast(`${HERO_BY_ID[event.heroId].name} 升至 Lv.${event.level}`);
-      if (event.type === "hero:unlocked") {
-        this.summonResultHero = event.heroId;
-        this.showToast(`新英雄加入 · ${HERO_BY_ID[event.heroId].name}`);
-        this.renderModal();
+      if (event.type === "hero:starred") this.showToast(`${HERO_BY_ID[event.heroId].name} 升至 ${event.stars} 星`);
+      if (event.type === "summon:completed") {
+        this.summonResults = event.results;
+        const unlocked = event.results.filter((pull) => pull.kind === "unlock");
+        if (unlocked.length === 1) {
+          this.showToast(`新英雄加入 · ${HERO_BY_ID[unlocked[0]!.heroId].name}`);
+        } else if (unlocked.length > 1) {
+          this.showToast(`新英雄 ×${unlocked.length}`);
+        } else if (event.results.length === 1 && event.results[0]!.kind === "marks") {
+          const pull = event.results[0]!;
+          this.showToast(`${HERO_BY_ID[pull.heroId].name} +${pull.marks} 印记`);
+        } else if (event.results.length > 1) {
+          const marks = event.results.reduce(
+            (sum, pull) => sum + (pull.kind === "marks" ? pull.marks : 0),
+            0,
+          );
+          this.showToast(`召唤完成 · 印记 +${marks}`);
+        }
+        if (this.modal === "summon") this.renderModal();
       }
     }
   }
@@ -1443,6 +1833,9 @@ export class AppShell {
   private closeModal(): void {
     this.modal = null;
     this.modalPayload = null;
+    this.itemTipsSource = "inventory";
+    this.equipTipsKind = null;
+    this.equipSkillTipsKind = null;
     this.renderModal();
   }
 

@@ -1,6 +1,10 @@
 import { createEmptyEquipment, EQUIPMENT_SLOTS, type EquipmentSlot } from "../content/items";
 import { HERO_DEFINITIONS } from "../content/heroes";
-import { normalizeInventoryItem, type InventoryItem } from "../progression/EquipmentSystem";
+import {
+  INVENTORY_STORAGE_LIMIT,
+  normalizeInventoryItem,
+  type InventoryItem,
+} from "../progression/EquipmentSystem";
 import type { HeroId } from "../simulation/types";
 
 function normalizeHeroEquipment(raw: unknown): Record<EquipmentSlot, string | null> {
@@ -28,7 +32,10 @@ export interface HeroProgress {
   heroId: HeroId;
   unlocked: boolean;
   level: number;
+  /** Duplicate-summon fragments used for star upgrades. */
   marks: number;
+  /** Star rank unlocked via fragments (0–5). */
+  stars: number;
   equipment: Record<EquipmentSlot, string | null>;
 }
 
@@ -92,6 +99,7 @@ export function createDefaultSave(now = Date.now()): SaveDataV1 {
         unlocked: index < 6,
         level: 1,
         marks: 0,
+        stars: 0,
         equipment: createEmptyEquipment(),
       },
     ]),
@@ -130,7 +138,7 @@ export function repairSaveData(input: unknown, now = Date.now()): SaveDataV1 {
   const base = createDefaultSave(now);
   if (!input || typeof input !== "object") return base;
   const source = input as Partial<SaveDataV1>;
-  const inventory = normalizeItemList(source.inventory, 40);
+  const inventory = normalizeItemList(source.inventory, INVENTORY_STORAGE_LIMIT);
   const overflow = normalizeItemList(source.overflow, 10);
 
   const roster = { ...base.roster };
@@ -143,6 +151,7 @@ export function repairSaveData(input: unknown, now = Date.now()): SaveDataV1 {
         unlocked: Boolean(value.unlocked || roster[hero.id].unlocked),
         level: clampInt(value.level, 1, 1, 20),
         marks: clampInt(value.marks, 0, 0, 9999),
+        stars: clampInt((value as { stars?: unknown }).stars, 0, 0, 5),
         equipment: normalizeHeroEquipment(value.equipment),
       };
     }

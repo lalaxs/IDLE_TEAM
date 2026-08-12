@@ -45,4 +45,18 @@ describe("daily equipment shop", () => {
     expect(stormseaShare).toBeGreaterThan(0.65);
     expect(stormseaShare).toBeLessThanOrEqual(1);
   });
+
+  it("rolls random affixes on every equipment offer", () => {
+    const items = Array.from({ length: 40 }, (_, day) =>
+      equipmentItems(`2026-11-${String((day % 28) + 1).padStart(2, "0")}`, 20),
+    ).flat();
+    expect(items.every((item) => item.rarity !== "common")).toBe(true);
+    expect(items.every((item) => item.affixes.length > 0)).toBe(true);
+    const signatures = new Set(
+      items.map((item) =>
+        item.affixes.map(({ affixId, value }) => `${affixId}:${value}`).join("|"),
+      ),
+    );
+    expect(signatures.size).toBeGreaterThan(8);
+  });
 });

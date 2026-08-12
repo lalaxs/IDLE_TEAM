@@ -56,6 +56,18 @@ describe("equipment", () => {
     expect(insertInventoryItem(inventory, [], rare).overflow).toHaveLength(1);
   });
 
+  it("ignores equipped items when checking backpack capacity", () => {
+    const inventory = Array.from({ length: 40 }, (_, index) =>
+      createEquipment("weapon_guard_blade", 1, "common", new SeededRandom(index + 1)),
+    );
+    const equippedIds = new Set([inventory[0]!.instanceId]);
+    const rare = createEquipment("weapon_frost_fang_saber", 15, "rare", new SeededRandom(100));
+    const result = insertInventoryItem(inventory, [], rare, equippedIds);
+    expect(result.overflow).toHaveLength(0);
+    expect(result.inventory).toHaveLength(41);
+    expect(result.inventory.at(-1)).toEqual(rare);
+  });
+
   it("binds Diablo Immortal–style legendary powers only on epic by definition", () => {
     expect(createEquipment("weapon_frost_fang_saber", 13, "rare", frostTraitRandom).traitId).toBeNull();
     expect(createEquipment("weapon_frost_fang_saber", 13, "epic", frostTraitRandom).traitId).toBe(

@@ -1,7 +1,8 @@
 import type { AppTab, GameAction } from "./actions";
-import type { AppEvent } from "./events";
-import { getUpgradeCost } from "../progression/HeroProgression";
+import type { AppEvent, SummonPullResult } from "./events";
+import { getStarUpgradeCost, getUpgradeCost, MAX_HERO_STARS } from "../progression/HeroProgression";
 import {
+  collectEquippedItemIds,
   getItemScore,
   getSalvageGold,
   insertInventoryItem,
@@ -81,8 +82,25 @@ export class GameStore {
       } else {
         events.push({ type: "toast", message: progress.level >= 20 ? "英雄已达等级上限" : "金币不足" });
       }
+    } else if (action.type === "hero:starUp") {
+      const progress = save.roster[action.heroId];
+      const cost = getStarUpgradeCost(progress.stars);
+      if (cost == null || progress.stars >= MAX_HERO_STARS) {
+        events.push({ type: "toast", message: "星级已达上限" });
+      } else if (progress.marks < cost) {
+        events.push({ type: "toast", message: "碎片不足" });
+      } else {
+        progress.marks -= cost;
+        progress.stars += 1;
+        events.push({ type: "hero:starred", heroId: action.heroId, stars: progress.stars });
+      }
     } else if (action.type === "item:add") {
-      const result = insertInventoryItem(save.inventory, save.overflow, action.item);
+      const result = insertInventoryItem(
+        save.inventory,
+        save.overflow,
+        action.item,
+        collectEquippedItemIds(save.roster),
+      );
       save.inventory = result.inventory;
       save.overflow = result.overflow;
       save.gold += result.goldGained;
@@ -112,7 +130,12 @@ export class GameStore {
       save.highestUnlockedStage = Math.max(save.highestUnlockedStage, Math.min(120, action.stage + 1));
       save.currentStage = Math.min(120, action.stage + 1);
       for (const item of action.items) {
-        const result = insertInventoryItem(save.inventory, save.overflow, item);
+        const result = insertInventoryItem(
+          save.inventory,
+          save.overflow,
+          item,
+          collectEquippedItemIds(save.roster),
+        );
         save.inventory = result.inventory;
         save.overflow = result.overflow;
         save.gold += result.goldGained;
@@ -130,7 +153,12 @@ export class GameStore {
         offer.sold = true;
         if (offer.kind === "gems") save.gems += offer.gemAmount;
         else {
-          const result = insertInventoryItem(save.inventory, save.overflow, offer.item);
+          const result = insertInventoryItem(
+            save.inventory,
+            save.overflow,
+            offer.item,
+            collectEquippedItemIds(save.roster),
+          );
           save.inventory = result.inventory;
           save.overflow = result.overflow;
           save.gold += result.goldGained;
@@ -144,7 +172,12 @@ export class GameStore {
     } else if (action.type === "offline:claim") {
       save.gold += action.gold;
       for (const item of action.items) {
-        const result = insertInventoryItem(save.inventory, save.overflow, item);
+        const result = insertInventoryItem(
+          save.inventory,
+          save.overflow,
+          item,
+          collectEquippedItemIds(save.roster),
+        );
         save.inventory = result.inventory;
         save.overflow = result.overflow;
         save.gold += result.goldGained;
@@ -167,17 +200,21 @@ export class GameStore {
       return;
     }
     save.gems -= cost;
+    const results: SummonPullResult[] = [];
     for (let index = 0; index < count; index += 1) {
       const heroId: HeroId =
         !save.roster.H07.unlocked ? "H07" : !save.roster.H08.unlocked ? "H08" : (["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08"][save.summonCount % 8] as HeroId);
       if (!save.roster[heroId].unlocked) {
         save.roster[heroId].unlocked = true;
+        results.push({ kind: "unlock", heroId });
         events.push({ type: "hero:unlocked", heroId });
       } else {
         save.roster[heroId].marks += 20;
+        results.push({ kind: "marks", heroId, marks: 20 });
       }
       save.summonCount += 1;
     }
+    events.push({ type: "summon:completed", results });
   }
 
   private equipItem(heroId: HeroId, itemId: string, events: AppEvent[]): void {
@@ -274,7 +311,12 @@ export class GameStore {
     }
     const consumed = new Set(outcome.consumedIds);
     save.inventory = save.inventory.filter(({ instanceId }) => !consumed.has(instanceId));
-    const inserted = insertInventoryItem(save.inventory, save.overflow, outcome.result);
+    const inserted = insertInventoryItem(
+      save.inventory,
+      save.overflow,
+      outcome.result,
+      collectEquippedItemIds(save.roster),
+    );
     save.inventory = inserted.inventory;
     save.overflow = inserted.overflow;
     save.gold += inserted.goldGained;

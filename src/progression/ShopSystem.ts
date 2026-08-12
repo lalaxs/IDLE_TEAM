@@ -1,9 +1,9 @@
 import { getGemOfferPrice } from "../content/shop";
 import { itemBudgetBase } from "../content/balance";
-import { RARITY_MULTIPLIER } from "../content/rarities";
+import { RARITY_MULTIPLIER, RARITY_RANK, type Rarity } from "../content/rarities";
 import { createEquipment, chooseRarity } from "./EquipmentSystem";
 import { selectEquipmentDefinition } from "./EquipmentPool";
-import { SeededRandom } from "../simulation/RandomSource";
+import { SeededRandom, type RandomSource } from "../simulation/RandomSource";
 import type { ShopOfferState } from "../persistence/schema";
 
 function hashText(value: string): number {
@@ -15,6 +15,12 @@ function hashText(value: string): number {
   return hash >>> 0;
 }
 
+/** Shop gear always has rolled affixes — never sell plain common (0 affix) stock. */
+function chooseShopRarity(stage: number, random: RandomSource): Rarity {
+  const rolled = chooseRarity(stage, random);
+  return RARITY_RANK[rolled] <= RARITY_RANK.common ? "uncommon" : rolled;
+}
+
 export function createShopOffers(
   dateKey: string,
   highestStage: number,
@@ -24,7 +30,7 @@ export function createShopOffers(
   const effectiveStage = Math.max(1, highestStage);
   const equipment: ShopOfferState[] = Array.from({ length: 3 }, (_, index) => {
     const definition = selectEquipmentDefinition(effectiveStage, random);
-    const rarity = chooseRarity(effectiveStage, random);
+    const rarity = chooseShopRarity(effectiveStage, random);
     const item = createEquipment(definition.id, effectiveStage, rarity, random);
     const budget = itemBudgetBase(effectiveStage);
     return {

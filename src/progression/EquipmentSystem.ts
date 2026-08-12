@@ -246,12 +246,48 @@ export function getSalvageGold(item: InventoryItem): number {
   return getItemBudget(item.stage, item.rarity, definition?.baseTier ?? 1) * 4;
 }
 
+/** Soft cap for unequipped items visible in the backpack UI. */
+export const BACKPACK_CAPACITY = 40;
+/** Persist equipped + backpack items together (8 heroes × 10 slots + backpack). */
+export const INVENTORY_STORAGE_LIMIT = BACKPACK_CAPACITY + 80;
+
+export function collectEquippedItemIds(
+  roster: Readonly<Record<string, { equipment: Readonly<Record<string, string | null>> }>>,
+): Set<string> {
+  const equipped = new Set<string>();
+  for (const progress of Object.values(roster)) {
+    for (const itemId of Object.values(progress.equipment)) {
+      if (itemId) equipped.add(itemId);
+    }
+  }
+  return equipped;
+}
+
+export function countBackpackItems(
+  inventory: readonly InventoryItem[],
+  equippedIds: ReadonlySet<string>,
+): number {
+  let count = 0;
+  for (const item of inventory) {
+    if (!equippedIds.has(item.instanceId)) count += 1;
+  }
+  return count;
+}
+
+export function backpackItems(
+  inventory: readonly InventoryItem[],
+  equippedIds: ReadonlySet<string>,
+): InventoryItem[] {
+  return inventory.filter((item) => !equippedIds.has(item.instanceId));
+}
+
 export function insertInventoryItem(
   inventory: InventoryItem[],
   overflow: InventoryItem[],
   item: InventoryItem,
+  equippedIds: ReadonlySet<string> = new Set(),
 ): { inventory: InventoryItem[]; overflow: InventoryItem[]; goldGained: number; rejected: boolean } {
-  if (inventory.length < 40) {
+  if (countBackpackItems(inventory, equippedIds) < BACKPACK_CAPACITY) {
     return { inventory: [...inventory, item], overflow, goldGained: 0, rejected: false };
   }
   if (item.rarity === "common") {

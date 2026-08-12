@@ -8,6 +8,7 @@ export type GameAction =
   | { type: "battle:setSpeed"; speed: 1 | 2 }
   | { type: "party:commit"; party: [HeroId | null, HeroId | null, HeroId | null, HeroId | null, HeroId | null] }
   | { type: "hero:levelUp"; heroId: HeroId }
+  | { type: "hero:starUp"; heroId: HeroId }
   | { type: "item:equip"; heroId: HeroId; itemId: string }
   | { type: "item:unequip"; heroId: HeroId; itemId: string }
   | { type: "item:salvage"; itemId: string }
