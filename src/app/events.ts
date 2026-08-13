@@ -1,3 +1,4 @@
+import type { AbilityId } from "../content/abilities";
 import type { HeroId } from "../simulation/types";
 
 export type SummonPullResult =
@@ -14,5 +15,9 @@ export type AppEvent =
   | { type: "item:salvaged"; itemId: string; gold: number }
   | { type: "item:salvagedMany"; count: number; gold: number }
   | { type: "alchemy:crafted"; resultId: string; fromRarity: string; toRarity: string }
+  | { type: "ability:upgraded"; abilityId: AbilityId; level: number }
+  | { type: "lootChest:charged"; level: number; progress: number }
+  | { type: "lootChest:leveled"; level: number; gold: number }
+  | { type: "lootChest:rewarded"; level: number; gold: number }
   | { type: "toast"; message: string }
   | { type: "save:failed"; message: string };

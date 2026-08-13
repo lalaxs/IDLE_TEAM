@@ -31,6 +31,8 @@ export interface BattleSimulationOptions {
   heroStartX?: Partial<Record<HeroId, number>>;
   startWithTravel?: boolean;
   seed: number;
+  /** Extra boss-meter fill rate (0.01 = +1%). */
+  bossProgressBonus?: number;
 }
 
 export interface HeroBattleBonus {
@@ -97,7 +99,8 @@ export class BattleSimulation {
   private wave = 1;
   private trashKills = 0;
   private bossActive = false;
-  private readonly trashQuota: number;
+  private readonly baseTrashQuota: number;
+  private trashQuota: number;
   private state: BattleSnapshot["state"] = "waveIntro";
   /** heroEntry: stage switch march-in from the left. waveBreak: pause before next foes. */
   private travelKind: "heroEntry" | "waveBreak" = "waveBreak";
@@ -113,7 +116,9 @@ export class BattleSimulation {
     this.stage = options.stage;
     this.seed = options.seed;
     this.random = new SeededRandom(options.seed);
-    this.trashQuota = Math.max(1, trashQuotaForStage(options.stage, options.seed));
+    this.baseTrashQuota = Math.max(1, trashQuotaForStage(options.stage, options.seed));
+    const progressBonus = Math.max(0, options.bossProgressBonus ?? 0);
+    this.trashQuota = Math.max(1, Math.ceil(this.baseTrashQuota / (1 + progressBonus)));
     const heroes = this.createHeroUnits(
       options.party,
       options.heroLevels,
@@ -176,6 +181,10 @@ export class BattleSimulation {
       hero.alive = false;
       this.events.push({ type: "unit:died", unitId: hero.id });
     }
+  }
+
+  setBossProgressBonus(bonus: number): void {
+    this.trashQuota = Math.max(1, Math.ceil(this.baseTrashQuota / (1 + Math.max(0, bonus))));
   }
 
   refreshHeroStats(
@@ -316,6 +325,8 @@ export class BattleSimulation {
   /** Trash kills fill the meter that eventually summons the boss. */
   private onEnemyKilled(enemy: UnitState): void {
     if (enemy.team !== "enemies") return;
+    const kind = ENEMY_BY_ID[enemy.sourceId as keyof typeof ENEMY_BY_ID]?.kind ?? "normal";
+    this.events.push({ type: "enemy:killed", kind });
     if (this.bossActive || enemy.sourceId === "B01") return;
     if (this.trashKills >= this.trashQuota) return;
     this.trashKills += 1;

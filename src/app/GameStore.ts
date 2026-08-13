@@ -11,6 +11,16 @@ import {
 import { craftAlchemyItem } from "../progression/AlchemySystem";
 import { RARITY_LABELS } from "../content/rarities";
 import { createShopOffers } from "../progression/ShopSystem";
+import {
+  getAbilityUpgradeCost,
+  getBackpackCapacity,
+  getChestProgressBonus,
+} from "../progression/AbilitySystem";
+import {
+  applyLootChestCharge,
+  getLootChestProgress,
+} from "../progression/LootChestSystem";
+import { ABILITY_BY_ID } from "../content/abilities";
 import { SeededRandom } from "../simulation/RandomSource";
 import type { SaveDataV1 } from "../persistence/schema";
 import type { HeroId } from "../simulation/types";
@@ -100,6 +110,7 @@ export class GameStore {
         save.overflow,
         action.item,
         collectEquippedItemIds(save.roster),
+        getBackpackCapacity(save.abilities),
       );
       save.inventory = result.inventory;
       save.overflow = result.overflow;
@@ -135,6 +146,7 @@ export class GameStore {
           save.overflow,
           item,
           collectEquippedItemIds(save.roster),
+          getBackpackCapacity(save.abilities),
         );
         save.inventory = result.inventory;
         save.overflow = result.overflow;
@@ -158,6 +170,7 @@ export class GameStore {
             save.overflow,
             offer.item,
             collectEquippedItemIds(save.roster),
+            getBackpackCapacity(save.abilities),
           );
           save.inventory = result.inventory;
           save.overflow = result.overflow;
@@ -169,6 +182,55 @@ export class GameStore {
         save.shop.freeRefreshUsed = true;
         save.shop.offers = createShopOffers(save.shop.dateKey, save.highestUnlockedStage, 1);
       }
+    } else if (action.type === "ability:upgrade") {
+      const definition = ABILITY_BY_ID[action.abilityId];
+      const level = save.abilities[action.abilityId] ?? 0;
+      if (!definition) {
+        events.push({ type: "toast", message: "未知能力" });
+      } else if (level >= definition.maxLevel) {
+        events.push({ type: "toast", message: "能力已达上限" });
+      } else {
+        const cost = getAbilityUpgradeCost(level);
+        if (save.gold < cost) {
+          events.push({ type: "toast", message: "金币不足" });
+        } else {
+          save.gold -= cost;
+          save.abilities[action.abilityId] = level + 1;
+          events.push({
+            type: "ability:upgraded",
+            abilityId: action.abilityId,
+            level: save.abilities[action.abilityId],
+          });
+          this.state.ui.toast = definition.name + " Lv." + save.abilities[action.abilityId];
+        }
+      }
+    } else if (action.type === "lootChest:charge") {
+      const result = applyLootChestCharge(
+        save.lootChest,
+        action.amount,
+        getChestProgressBonus(save.abilities),
+        Math.max(1, save.highestClearedStage || save.highestUnlockedStage),
+      );
+      save.lootChest = result.chest;
+      if (result.goldGained > 0) save.gold += result.goldGained;
+      events.push({
+        type: "lootChest:charged",
+        level: result.chest.level,
+        progress: getLootChestProgress(result.chest),
+      });
+      if (result.leveledUp) {
+        events.push({
+          type: "lootChest:leveled",
+          level: result.chest.level,
+          gold: result.goldGained,
+        });
+      } else if (result.rewarded) {
+        events.push({
+          type: "lootChest:rewarded",
+          level: result.chest.level,
+          gold: result.goldGained,
+        });
+      }
     } else if (action.type === "offline:claim") {
       save.gold += action.gold;
       for (const item of action.items) {
@@ -177,6 +239,7 @@ export class GameStore {
           save.overflow,
           item,
           collectEquippedItemIds(save.roster),
+          getBackpackCapacity(save.abilities),
         );
         save.inventory = result.inventory;
         save.overflow = result.overflow;
@@ -316,6 +379,7 @@ export class GameStore {
       save.overflow,
       outcome.result,
       collectEquippedItemIds(save.roster),
+      getBackpackCapacity(save.abilities),
     );
     save.inventory = inserted.inventory;
     save.overflow = inserted.overflow;

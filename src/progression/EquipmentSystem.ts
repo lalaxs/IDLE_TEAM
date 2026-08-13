@@ -246,10 +246,10 @@ export function getSalvageGold(item: InventoryItem): number {
   return getItemBudget(item.stage, item.rarity, definition?.baseTier ?? 1) * 4;
 }
 
-/** Soft cap for unequipped items visible in the backpack UI. */
+/** Soft cap for unequipped items visible in the backpack UI (before ability bonuses). */
 export const BACKPACK_CAPACITY = 40;
-/** Persist equipped + backpack items together (8 heroes × 10 slots + backpack). */
-export const INVENTORY_STORAGE_LIMIT = BACKPACK_CAPACITY + 80;
+/** Persist equipped + backpack items together (8 heroes × 10 slots + backpack + ability upgrades). */
+export const INVENTORY_STORAGE_LIMIT = BACKPACK_CAPACITY + 60 + 80;
 
 export function collectEquippedItemIds(
   roster: Readonly<Record<string, { equipment: Readonly<Record<string, string | null>> }>>,
@@ -286,8 +286,9 @@ export function insertInventoryItem(
   overflow: InventoryItem[],
   item: InventoryItem,
   equippedIds: ReadonlySet<string> = new Set(),
+  capacity = BACKPACK_CAPACITY,
 ): { inventory: InventoryItem[]; overflow: InventoryItem[]; goldGained: number; rejected: boolean } {
-  if (countBackpackItems(inventory, equippedIds) < BACKPACK_CAPACITY) {
+  if (countBackpackItems(inventory, equippedIds) < capacity) {
     return { inventory: [...inventory, item], overflow, goldGained: 0, rejected: false };
   }
   if (item.rarity === "common") {

@@ -24,7 +24,7 @@ export class GameApp {
   constructor(private readonly root: HTMLElement) {
     const now = Date.now();
     const save = this.prepareSave(this.repository.load());
-    const offline = calculateOfflineReward(now - save.lastActiveAt, save.highestClearedStage, save.lastActiveAt);
+    const offline = calculateOfflineReward(now - save.lastActiveAt, save.highestClearedStage, save.lastActiveAt, save.abilities);
     save.lastActiveAt = now;
     this.session = new GameSession(save);
     this.shell = new AppShell(root, this.session.store, {

@@ -70,6 +70,7 @@ export type BattleEvent =
   | { type: "skill:resolved"; sourceId: string; skillId: string; targetIds: string[] }
   | { type: "status:applied"; targetId: string; kind: StatusKind }
   | { type: "unit:died"; unitId: string }
+  | { type: "enemy:killed"; kind: "normal" | "elite" | "boss" }
   | { type: "battle:victory"; stage: number }
   | { type: "battle:defeat"; stage: number }
   | { type: "loot:revealed"; itemId: string }

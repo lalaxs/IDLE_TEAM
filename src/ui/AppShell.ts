@@ -18,7 +18,6 @@ import { RARITY_ORDER } from "../content/rarities";
 import { ACTIVE_SKILL_BY_HERO, PASSIVE_SKILL_BY_HERO } from "../content/skills";
 import { STAGE_DEFINITIONS } from "../content/stages";
 import {
-  BACKPACK_CAPACITY,
   backpackItems,
   compareInventoryItems,
   countBackpackItems,
@@ -38,9 +37,27 @@ import {
   validateAlchemyInputs,
 } from "../progression/AlchemySystem";
 import { getStarUpgradeCost, getUpgradeCost, MAX_HERO_STARS } from "../progression/HeroProgression";
+import {
+  ABILITY_DEFINITIONS,
+  COMBAT_ABILITIES,
+  ECONOMY_ABILITIES,
+  GENERAL_ABILITIES,
+  abilityCardMeta,
+  getBackpackCapacity,
+} from "../progression/AbilitySystem";
+import {
+  ABILITY_CATEGORY_TABS,
+  type AbilityCategory,
+  type AbilityId,
+} from "../content/abilities";
 import type { GameStore, GameStoreState } from "../app/GameStore";
 import type { AppEvent, SummonPullResult } from "../app/events";
 import type { BattleEvent, BattleSnapshot, HeroId } from "../simulation/types";
+import {
+  getLootChestLabel,
+  getLootChestProgress,
+  LOOT_CHEST_MAX_LEVEL,
+} from "../progression/LootChestSystem";
 import { bindDragScroll } from "./dragScroll";
 
 export interface AppShellOptions {
@@ -176,6 +193,9 @@ export class AppShell {
   private salvageSlotFilter: EquipmentSlot | "all" = "all";
   private salvageRarityFilter: Set<Rarity> = new Set<Rarity>(["common"]);
   private salvageSelectedIds: Set<string> = new Set();
+  private shopPanel: "daily" | "abilities" = "daily";
+  private abilityCategory: AbilityCategory = "economy";
+  private selectedAbilityId: AbilityId | null = null;
   private alchemySlots: (string | null)[] = Array.from({ length: ALCHEMY_SLOT_COUNT }, () => null);
   private alchemyPreviewId: string | null = null;
   private itemTipsSource: "inventory" | "alchemy" = "inventory";
@@ -214,6 +234,16 @@ export class AppShell {
             </div>
             <span class="battle-state-label">正在前进</span>
           </div>
+          <div class="loot-chest-dock" aria-label="奖励宝箱">
+            <button type="button" class="loot-chest-badge" data-action="loot-chest-info" data-level="1" aria-label="奖励宝箱">
+              <span class="loot-chest-icon" aria-hidden="true">▣</span>
+              <span class="loot-chest-tier">Lv.1</span>
+            </button>
+            <div class="loot-chest-meter" role="progressbar" aria-label="宝箱充能" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <span class="loot-chest-fill"></span>
+              <span class="loot-chest-label">充能 0%</span>
+            </div>
+          </div>
         </section>
         <section class="party-strip" aria-label="当前小队"></section>
         <div class="alchemy-tips-host" aria-live="polite"></div>
@@ -236,6 +266,13 @@ export class AppShell {
     root.addEventListener("click", (event) => this.onClick(event));
     root.addEventListener("change", (event) => this.onChange(event));
     store.subscribe((state, events) => {
+      const onlyChestCharge =
+        events.length > 0 &&
+        events.every(({ type }) => type === "lootChest:charged");
+      if (onlyChestCharge) {
+        this.renderLootChest(state);
+        return;
+      }
       this.renderState(state);
       this.presentAppEvents(events);
     });
@@ -304,10 +341,35 @@ export class AppShell {
 
   private renderState(state: GameStoreState): void {
     this.renderTopbar(state);
+    this.renderLootChest(state);
     this.renderParty(state);
     this.renderPanel(state);
     this.renderNav(state);
     if (this.modal) this.renderModal();
+  }
+
+  private renderLootChest(state: GameStoreState): void {
+    const chest = state.save.lootChest;
+    const progress = getLootChestProgress(chest);
+    const percent = Math.round(progress * 100);
+    const badge = this.root.querySelector<HTMLElement>(".loot-chest-badge");
+    const meter = this.root.querySelector<HTMLElement>(".loot-chest-meter");
+    const fill = this.root.querySelector<HTMLElement>(".loot-chest-fill");
+    const label = this.root.querySelector<HTMLElement>(".loot-chest-label");
+    const tier = this.root.querySelector<HTMLElement>(".loot-chest-tier");
+    if (!badge || !meter || !fill || !label || !tier) return;
+    badge.dataset.level = String(chest.level);
+    badge.setAttribute(
+      "aria-label",
+      `${getLootChestLabel(chest.level)} Lv.${chest.level}/${LOOT_CHEST_MAX_LEVEL}`,
+    );
+    tier.textContent = `Lv.${chest.level}`;
+    meter.setAttribute("aria-valuenow", String(percent));
+    fill.style.width = `${percent}%`;
+    label.textContent =
+      chest.level >= LOOT_CHEST_MAX_LEVEL
+        ? `满级充能 ${percent}%`
+        : `充能 ${percent}%`;
   }
 
   private renderTopbar(state: GameStoreState): void {
@@ -406,7 +468,7 @@ export class AppShell {
     const occupied = countBackpackItems(state.save.inventory, equippedIds);
     this.content.innerHTML = `
       <div class="panel-heading compact" data-panel="inventory">
-        <span class="panel-meta" aria-label="背包容量">${occupied}/${BACKPACK_CAPACITY}</span>
+        <span class="panel-meta" aria-label="背包容量">${occupied}/${getBackpackCapacity(state.save.abilities)}</span>
         <div class="panel-actions">
           <button class="secondary-button compact" data-action="inventory-organize">整理</button>
           <button class="secondary-button compact" data-action="inventory-salvage-open">分解</button>
@@ -1183,7 +1245,18 @@ export class AppShell {
   }
 
   private renderShop(state: GameStoreState): void {
+    const dailyActive = this.shopPanel === "daily";
     this.content.innerHTML = `
+      <div class="shop-section-tabs" role="tablist" aria-label="商店分区">
+        <button role="tab" class="shop-section-tab ${dailyActive ? "active" : ""}" data-action="shop-panel" data-panel="daily" aria-selected="${dailyActive}">今日补给</button>
+        <button role="tab" class="shop-section-tab ${!dailyActive ? "active" : ""}" data-action="shop-panel" data-panel="abilities" aria-selected="${!dailyActive}">能力提升</button>
+      </div>
+      ${dailyActive ? this.renderDailyShop(state) : this.renderAbilityShop(state)}
+    `;
+  }
+
+  private renderDailyShop(state: GameStoreState): string {
+    return `
       <div class="panel-heading compact" data-panel="shop">
         <span class="panel-meta">今日补给</span>
         <div class="panel-actions">
@@ -1209,6 +1282,48 @@ export class AppShell {
             </button>
           </article>`;
         }).join("")}
+      </div>
+    `;
+  }
+
+  private renderAbilityShop(state: GameStoreState): string {
+    const list =
+      this.abilityCategory === "combat"
+        ? COMBAT_ABILITIES
+        : this.abilityCategory === "general"
+          ? GENERAL_ABILITIES
+          : ECONOMY_ABILITIES;
+
+    return `
+      <div class="ability-shop-layout" data-panel="shop-abilities">
+        <div class="ability-category-tabs" role="tablist" aria-label="能力分类" aria-orientation="vertical">
+          ${ABILITY_CATEGORY_TABS.map(
+            (tab) => `<button
+              role="tab"
+              class="ability-category-tab ${this.abilityCategory === tab.id ? "active" : ""}"
+              data-action="ability-category"
+              data-category="${tab.id}"
+              aria-selected="${this.abilityCategory === tab.id}"
+            >${tab.label}</button>`,
+          ).join("")}
+        </div>
+        <div class="ability-icon-grid" role="list">
+          ${list
+            .map((definition) => {
+              const pending = definition.active ? "" : " pending";
+              return `<button
+                class="ability-icon-tile accent-${definition.accent}${pending}"
+                data-action="ability-select"
+                data-ability-id="${definition.id}"
+                role="listitem"
+                aria-label="${definition.name}"
+              >
+                <span class="ability-icon-glyph" aria-hidden="true">${definition.icon}</span>
+                <strong class="ability-icon-name">${definition.name}</strong>
+              </button>`;
+            })
+            .join("")}
+        </div>
       </div>
     `;
   }
@@ -1393,9 +1508,23 @@ export class AppShell {
       const currency = this.modalPayload as string;
       this.overlay.innerHTML = this.sheet(currency === "gold" ? "金币来源" : "宝石来源", `
         <div class="info-card"><span>${currency === "gold" ? "●" : "◆"}</span>
-          <p>${currency === "gold" ? "击败敌人、离线收益和普通装备溢出可获得金币。金币用于英雄升级和冒险商店。" : "首次通关关卡可获得宝石。宝石只用于 Demo 英雄召唤，不包含付费入口。"}</p>
+          <p>${currency === "gold" ? "击败敌人、离线收益和普通装备溢出可获得金币。金币用于英雄升级、冒险商店和能力提升。" : "首次通关关卡可获得宝石。宝石只用于 Demo 英雄召唤，不包含付费入口。"}</p>
         </div>
       `);
+    } else if (this.modal === "loot-chest") {
+      const chest = state.save.lootChest;
+      const progress = Math.round(getLootChestProgress(chest) * 100);
+      this.overlay.innerHTML = this.sheet("奖励宝箱", `
+        <div class="info-card loot-chest-info">
+          <span class="loot-chest-info-icon" data-level="${chest.level}" aria-hidden="true">▣</span>
+          <div>
+            <strong>${getLootChestLabel(chest.level)} · Lv.${chest.level}/${LOOT_CHEST_MAX_LEVEL}</strong>
+            <p>消灭怪物可为宝箱充能。进度条满后宝箱升级，等级越高奖励越好。当前充能 ${progress}%。</p>
+          </div>
+        </div>
+      `);
+    } else if (this.modal === "ability-tips") {
+      this.renderAbilityTips(state);
     } else if (this.modal === "item-tips") {
       this.renderItemTips(state);
     } else if (this.modal === "equip") {
@@ -1493,6 +1622,40 @@ export class AppShell {
     }
   }
 
+  private renderAbilityTips(state: GameStoreState): void {
+    const abilityId = (this.modalPayload as AbilityId | null) ?? this.selectedAbilityId;
+    const definition = abilityId
+      ? ABILITY_DEFINITIONS.find((ability) => ability.id === abilityId) ?? null
+      : null;
+    if (!definition) {
+      this.closeModal();
+      return;
+    }
+    const level = state.save.abilities[definition.id] ?? 0;
+    const meta = abilityCardMeta(definition.id, level);
+    const canBuy = !meta.atMax && meta.nextCost != null && state.save.gold >= meta.nextCost;
+    this.overlay.innerHTML = `
+      <div class="modal-backdrop" data-action="close-modal"></div>
+      <section class="bottom-sheet ability-tips-sheet" role="dialog" aria-modal="true" aria-label="${definition.name}">
+        <header>
+          <h2>${definition.name}</h2>
+          <button class="modal-close" data-action="close-modal" aria-label="关闭">×</button>
+        </header>
+        <div class="ability-tips-body accent-${definition.accent}${definition.active ? "" : " pending"}">
+          <div class="ability-tips-icon" aria-hidden="true">${definition.icon}</div>
+          <div class="ability-tips-copy">
+            <span class="ability-tips-level">Lv.${level}/${definition.maxLevel}</span>
+            <strong class="ability-tips-effect">${meta.effectText}</strong>
+            <p>${definition.blurb}</p>
+          </div>
+          <button class="primary-button wide" data-action="ability-upgrade" data-ability-id="${definition.id}" ${meta.atMax || !canBuy ? "disabled" : ""}>
+            ${meta.atMax ? "已满级" : `升级 · ● ${compact(meta.nextCost!)}`}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
   private sheet(title: string, content: string): string {
     return `<div class="modal-backdrop" data-action="close-modal"></div><section class="bottom-sheet" role="dialog" aria-modal="true"><header><h2>${title}</h2><button class="modal-close" data-action="close-modal" aria-label="关闭">×</button></header>${content}</section>`;
   }
@@ -1504,7 +1667,11 @@ export class AppShell {
 
     if (!target || !action) return;
     this.options.onSoundRequested?.("button");
-    if (action === "select-tab") this.store.dispatch({ type: "ui:selectTab", tab: target.dataset.tab as keyof typeof tabMeta });
+    if (action === "select-tab") {
+      const tab = target.dataset.tab as keyof typeof tabMeta;
+      if (tab !== "shop") this.shopPanel = "daily";
+      this.store.dispatch({ type: "ui:selectTab", tab });
+    }
     else if (action === "open-stages") this.store.dispatch({ type: "ui:selectTab", tab: "stages" });
     else if (action === "alchemy-auto-fill") {
       const state = this.store.getState();
@@ -1709,6 +1876,30 @@ export class AppShell {
       this.syncEquipModal(this.store.getState());
     } else if (action === "shop-buy") this.store.dispatch({ type: "shop:buy", offerId: target.dataset.offerId! });
     else if (action === "shop-refresh") this.store.dispatch({ type: "shop:refresh" });
+    else if (action === "shop-panel") {
+      const panel = target.dataset.panel === "abilities" ? "abilities" : "daily";
+      this.shopPanel = panel;
+      this.renderPanel(this.store.getState());
+    } else if (action === "ability-category") {
+      const category = target.dataset.category as AbilityCategory | undefined;
+      if (category !== "economy" && category !== "combat" && category !== "general") return;
+      this.abilityCategory = category;
+      this.selectedAbilityId = null;
+      this.renderPanel(this.store.getState());
+    } else if (action === "ability-select") {
+      const abilityId = target.dataset.abilityId as AbilityId | undefined;
+      if (!abilityId) return;
+      this.selectedAbilityId = abilityId;
+      this.modalPayload = abilityId;
+      this.openModal("ability-tips");
+    } else if (action === "ability-upgrade") {
+      const abilityId = target.dataset.abilityId as AbilityId | undefined;
+      if (!abilityId) return;
+      this.selectedAbilityId = abilityId;
+      this.modalPayload = abilityId;
+      this.store.dispatch({ type: "ability:upgrade", abilityId });
+      if (this.modal === "ability-tips") this.renderModal();
+    }
     else if (action === "hero-detail") {
       const heroId = target.dataset.heroId as HeroId | undefined;
       if (!heroId || !this.store.getState().save.roster[heroId]?.unlocked) return;
@@ -1801,6 +1992,20 @@ export class AppShell {
   private presentAppEvents(events: readonly AppEvent[]): void {
     for (const event of events) {
       if (event.type === "toast") this.showToast(event.message);
+      if (event.type === "lootChest:leveled") {
+        this.showToast(`宝箱升至 Lv.${event.level} · ● ${event.gold}`);
+        this.renderTopbar(this.store.getState());
+        this.renderLootChest(this.store.getState());
+      }
+      if (event.type === "lootChest:rewarded") {
+        this.showToast(`宝箱奖励 · ● ${event.gold}`);
+        this.renderTopbar(this.store.getState());
+        this.renderLootChest(this.store.getState());
+      }
+      if (event.type === "ability:upgraded") {
+        const def = ABILITY_DEFINITIONS.find((ability) => ability.id === event.abilityId);
+        if (def) this.showToast(def.name + " Lv." + event.level);
+      }
       if (event.type === "hero:leveled") this.showToast(`${HERO_BY_ID[event.heroId].name} 升至 Lv.${event.level}`);
       if (event.type === "hero:starred") this.showToast(`${HERO_BY_ID[event.heroId].name} 升至 ${event.stars} 星`);
       if (event.type === "summon:completed") {

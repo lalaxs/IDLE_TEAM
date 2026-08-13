@@ -1,3 +1,4 @@
+import type { AbilityId } from "../content/abilities";
 import type { InventoryItem } from "../progression/EquipmentSystem";
 import type { HeroId } from "../simulation/types";
 
@@ -20,6 +21,8 @@ export type GameAction =
   | { type: "stage:victory"; stage: number; gold: number; items: InventoryItem[] }
   | { type: "shop:buy"; offerId: string }
   | { type: "shop:refresh" }
+  | { type: "ability:upgrade"; abilityId: AbilityId }
+  | { type: "lootChest:charge"; amount: number }
   | { type: "summon:single" }
   | { type: "summon:five" }
   | { type: "offline:claim"; gold: number; items: InventoryItem[] }

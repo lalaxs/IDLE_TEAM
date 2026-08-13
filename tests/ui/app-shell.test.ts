@@ -575,6 +575,57 @@ describe("AppShell", () => {
     expect(root.querySelector(".equip-level-cost")?.textContent).toMatch(/升级费用/);
   });
 
+  it("switches between daily shop and ability upgrades", () => {
+    const root = document.createElement("main");
+    const save = createDefaultSave();
+    save.gold = 500;
+    const store = new GameStore(save);
+    new AppShell(root, store, {});
+    store.dispatch({ type: "tutorial:complete" });
+    store.dispatch({ type: "ui:selectTab", tab: "shop" });
+
+    expect(root.querySelector('[data-action="shop-panel"][data-panel="daily"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="shop-panel"][data-panel="abilities"]')).not.toBeNull();
+    expect(root.querySelector(".shop-grid")).not.toBeNull();
+    expect(root.querySelector(".ability-icon-grid")).toBeNull();
+
+    root.querySelector<HTMLButtonElement>('[data-action="shop-panel"][data-panel="abilities"]')?.click();
+    expect(root.querySelector(".ability-shop-layout")).not.toBeNull();
+    expect(root.querySelector('[data-panel="shop-abilities"] .panel-meta')).toBeNull();
+    expect(root.querySelectorAll(".ability-category-tab").length).toBe(3);
+    expect(root.querySelectorAll(".ability-icon-tile").length).toBe(4);
+    expect(root.textContent).toContain("金币掉落固定值");
+    expect(root.querySelector(".ability-icon-level")).toBeNull();
+    expect(root.querySelector(".ability-icon-frame")).toBeNull();
+
+    root.querySelector<HTMLButtonElement>('[data-action="ability-category"][data-category="combat"]')?.click();
+    expect(root.querySelectorAll(".ability-icon-tile").length).toBe(8);
+    expect(root.textContent).toContain("英雄攻击力固定值");
+
+    root.querySelector<HTMLButtonElement>('[data-action="ability-category"][data-category="general"]')?.click();
+    expect(root.querySelectorAll(".ability-icon-tile").length).toBe(4);
+    expect(root.querySelector('[data-ability-id="backpack_slots"]')).not.toBeNull();
+    expect(root.querySelector('[data-ability-id="chest_progress"]')).not.toBeNull();
+    root.querySelector<HTMLButtonElement>('[data-action="ability-select"][data-ability-id="backpack_slots"]')?.click();
+    expect(root.querySelector(".ability-tips-sheet")?.textContent).toContain("背包格子");
+    root.querySelector<HTMLButtonElement>('[data-action="close-modal"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-action="ability-select"][data-ability-id="chest_progress"]')?.click();
+    expect(root.querySelector(".ability-tips-sheet")?.textContent).toContain("宝箱进度加成");
+    root.querySelector<HTMLButtonElement>('[data-action="close-modal"]')?.click();
+
+    root.querySelector<HTMLButtonElement>('[data-action="ability-category"][data-category="economy"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-action="ability-select"][data-ability-id="gold_flat"]')?.click();
+    const before = store.getState().save.abilities.gold_flat;
+    const beforeGold = store.getState().save.gold;
+    root.querySelector<HTMLButtonElement>('[data-action="ability-upgrade"][data-ability-id="gold_flat"]')?.click();
+    expect(store.getState().save.abilities.gold_flat).toBe(before + 1);
+    expect(store.getState().save.gold).toBeLessThan(beforeGold);
+
+    root.querySelector<HTMLButtonElement>('[data-action="shop-panel"][data-panel="daily"]')?.click();
+    expect(root.querySelector(".ability-icon-grid")).toBeNull();
+    expect(root.querySelector(".shop-grid")).not.toBeNull();
+  });
+
   it("shows the newly unlocked hero on the summon result card", () => {
     const root = document.createElement("main");
     const store = new GameStore(createDefaultSave());

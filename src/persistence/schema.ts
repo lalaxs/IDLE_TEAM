@@ -1,6 +1,16 @@
 import { createEmptyEquipment, EQUIPMENT_SLOTS, type EquipmentSlot } from "../content/items";
 import { HERO_DEFINITIONS } from "../content/heroes";
 import {
+  createDefaultAbilityLevels,
+  normalizeAbilityLevels,
+  type AbilityLevels,
+} from "../progression/AbilitySystem";
+import {
+  createDefaultLootChest,
+  normalizeLootChest,
+  type LootChestState,
+} from "../progression/LootChestSystem";
+import {
   INVENTORY_STORAGE_LIMIT,
   normalizeInventoryItem,
   type InventoryItem,
@@ -74,6 +84,8 @@ export interface SaveDataV1 {
     freeRefreshUsed: boolean;
     offers: ShopOfferState[];
   };
+  abilities: AbilityLevels;
+  lootChest: LootChestState;
   tutorialCompleted: boolean;
   settings: {
     battleSpeed: 1 | 2;
@@ -124,6 +136,8 @@ export function createDefaultSave(now = Date.now()): SaveDataV1 {
       freeRefreshUsed: false,
       offers: [],
     },
+    abilities: createDefaultAbilityLevels(),
+    lootChest: createDefaultLootChest(),
     tutorialCompleted: false,
     settings: {
       battleSpeed: 1,
@@ -205,6 +219,8 @@ export function repairSaveData(input: unknown, now = Date.now()): SaveDataV1 {
             offers: shopOffers.length ? shopOffers : Array.isArray(source.shop.offers) ? source.shop.offers.slice(0, 4) : [],
           }
         : base.shop,
+    abilities: normalizeAbilityLevels(source.abilities),
+    lootChest: normalizeLootChest(source.lootChest),
     tutorialCompleted: Boolean(source.tutorialCompleted),
     settings: {
       battleSpeed: source.settings?.battleSpeed === 2 ? 2 : 1,

@@ -13,6 +13,7 @@ import {
   SKILL_COOLDOWN_REDUCTION_CAP,
 } from "../content/affixes";
 import type { SaveDataV1 } from "../persistence/schema";
+import { applyCombatAbilityBonus } from "./AbilitySystem";
 import type { HeroBattleBonus } from "../simulation/BattleSimulation";
 import type { HeroId } from "../simulation/types";
 
@@ -91,7 +92,7 @@ export function getEquipmentBonuses(save: SaveDataV1): Partial<Record<HeroId, He
       if (setBonus.critDamagePct) bonus.critDamagePct = (bonus.critDamagePct ?? 0) + setBonus.critDamagePct;
       if (setBonus.eliteDamagePct) bonus.eliteDamagePct = (bonus.eliteDamagePct ?? 0) + setBonus.eliteDamagePct / 100;
     }
-    result[heroId] = bonus;
+    result[heroId] = applyCombatAbilityBonus(bonus, save.abilities);
   }
   return result;
 }

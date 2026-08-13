@@ -4,13 +4,14 @@ import { createEquipment, chooseRarity, type InventoryItem } from "./EquipmentSy
 import { selectEquipmentDefinition } from "./EquipmentPool";
 import { SeededRandom } from "../simulation/RandomSource";
 import { createWaveDefinitions } from "../simulation/WaveSystem";
+import { applyGoldAbilityBonus, type AbilityLevels } from "./AbilitySystem";
 
 export interface StageRewards {
   gold: number;
   items: InventoryItem[];
 }
 
-export function generateStageRewards(stage: number, seed: number): StageRewards {
+export function generateStageRewards(stage: number, seed: number, abilities?: AbilityLevels): StageRewards {
   const random = new SeededRandom(seed + stage * 7_919);
   // Gold tracks HP pressure lightly (DI: denser rewards in harder zones).
   const power = enemyHpMultiplier(stage);
@@ -32,5 +33,6 @@ export function generateStageRewards(stage: number, seed: number): StageRewards 
       }
     }
   }
+  if (abilities) gold = applyGoldAbilityBonus(gold, abilities);
   return { gold, items };
 }

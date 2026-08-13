@@ -161,6 +161,116 @@ p {
   pointer-events: none;
 }
 
+.loot-chest-dock {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.loot-chest-badge {
+  width: 52px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1px;
+  border: 2px solid #8f7350;
+  border-bottom-width: 3px;
+  border-radius: 11px;
+  background: linear-gradient(#f0d9a4, #d4b06a);
+  color: #5a4218;
+  cursor: pointer;
+  appearance: none;
+}
+
+.loot-chest-badge[data-level="2"] {
+  border-color: #9a6a3a;
+  background: linear-gradient(#e8c08a, #c7894e);
+}
+.loot-chest-badge[data-level="3"] {
+  border-color: #7d8794;
+  background: linear-gradient(#dce3ec, #aeb8c6);
+  color: #2f3740;
+}
+.loot-chest-badge[data-level="4"] {
+  border-color: #b08a3c;
+  background: linear-gradient(#ffe7a8, #e2c26d);
+}
+.loot-chest-badge[data-level="5"] {
+  border-color: #8a5a2a;
+  background: linear-gradient(#f6d28a, #d29a45 55%, #f0c56a);
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 200, 0.45);
+}
+
+.loot-chest-icon {
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.loot-chest-tier {
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+}
+
+.loot-chest-meter {
+  position: relative;
+  height: 22px;
+  border: 2px solid rgba(58, 48, 43, .7);
+  border-radius: 999px;
+  background: rgba(53, 70, 59, .55);
+  box-shadow: 0 2px 0 rgba(58, 48, 43, .2);
+  overflow: hidden;
+}
+
+.loot-chest-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c9a24a, #f0d27a);
+  transition: width 220ms ease-out;
+}
+
+.loot-chest-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff8e8;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(40, 32, 28, .75);
+  pointer-events: none;
+}
+
+.loot-chest-info {
+  align-items: center;
+}
+
+.loot-chest-info-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #8f7350;
+  border-radius: 12px;
+  background: linear-gradient(#f0d9a4, #d4b06a);
+  color: #5a4218;
+  font-size: 20px;
+  font-weight: 900;
+}
+
 .battle-state-label {
   padding: 2px 7px;
   border-radius: 6px;
@@ -660,6 +770,256 @@ p {
 .gem-offer .offer-art {
   color: var(--purple);
 }
+
+.shop-section-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.shop-section-tab {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 2px solid #93806a;
+  border-bottom-width: 4px;
+  border-radius: 11px;
+  background: #f9f0da;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.shop-section-tab.active {
+  border-color: #4d624f;
+  background: linear-gradient(#829f68, #668253);
+  color: #fff;
+}
+
+.ability-shop-layout {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-height: 0;
+}
+
+.ability-category-tabs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin: 0;
+}
+
+.ability-category-tab {
+  min-height: 54px;
+  padding: 8px 4px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.12em;
+  border: 2px solid #93806a;
+  border-bottom-width: 3px;
+  border-radius: 10px;
+  background: #f9f0da;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.ability-category-tab.active {
+  border-color: #4d624f;
+  background: linear-gradient(#829f68, #668253);
+  color: #fff;
+}
+
+.ability-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+
+.ability-icon-tile {
+  min-width: 0;
+  padding: 4px 2px;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+
+.ability-icon-tile.pending {
+  opacity: 0.72;
+}
+
+.ability-icon-glyph {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #9d8d74;
+  border-radius: 10px;
+  background: #fff9e9;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  color: #5d4a34;
+}
+
+.ability-icon-tile.accent-gold .ability-icon-glyph {
+  border-color: #b08a3c;
+  background: linear-gradient(#ffe7a8, #e2c26d);
+  color: #6a4c16;
+}
+.ability-icon-tile.accent-amber .ability-icon-glyph {
+  border-color: #b2773a;
+  background: linear-gradient(#ffd3a0, #e3a45f);
+  color: #6d3f14;
+}
+.ability-icon-tile.accent-teal .ability-icon-glyph {
+  border-color: #4f7f72;
+  background: linear-gradient(#bfe6d8, #7fb9a8);
+  color: #1f4d43;
+}
+.ability-icon-tile.accent-violet .ability-icon-glyph {
+  border-color: #6f6288;
+  background: linear-gradient(#d9d0ef, #a899c8);
+  color: #3d3358;
+}
+.ability-icon-tile.accent-crimson .ability-icon-glyph {
+  border-color: #a85a4a;
+  background: linear-gradient(#f0b4a6, #d27a68);
+  color: #5c2418;
+}
+.ability-icon-tile.accent-slate .ability-icon-glyph {
+  border-color: #6d7580;
+  background: linear-gradient(#d5dbe3, #9aa5b2);
+  color: #2f3740;
+}
+.ability-icon-tile.accent-sky .ability-icon-glyph {
+  border-color: #4f7fa0;
+  background: linear-gradient(#b9d8ef, #7eafd0);
+  color: #1d3f55;
+}
+.ability-icon-tile.accent-rose .ability-icon-glyph {
+  border-color: #a45d72;
+  background: linear-gradient(#efc0cd, #d4899d);
+  color: #5a2435;
+}
+.ability-icon-tile.accent-moss .ability-icon-glyph {
+  border-color: #5f7a4d;
+  background: linear-gradient(#d5e6b8, #9bb574);
+  color: #2f451c;
+}
+
+.ability-icon-name {
+  max-width: 100%;
+  color: #5f4d3c;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-align: center;
+  word-break: break-all;
+}
+
+.ability-tips-body {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+  padding: 4px 2px 8px;
+}
+
+.ability-tips-body.pending {
+  opacity: 0.92;
+}
+
+.ability-tips-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #f3e6c8;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.ability-tips-body.accent-gold .ability-tips-icon {
+  background: linear-gradient(#ffe7a8, #e2c26d);
+  color: #6a4c16;
+}
+.ability-tips-body.accent-amber .ability-tips-icon {
+  background: linear-gradient(#ffd3a0, #e3a45f);
+  color: #6d3f14;
+}
+.ability-tips-body.accent-teal .ability-tips-icon {
+  background: linear-gradient(#bfe6d8, #7fb9a8);
+  color: #1f4d43;
+}
+.ability-tips-body.accent-violet .ability-tips-icon {
+  background: linear-gradient(#d9d0ef, #a899c8);
+  color: #3d3358;
+}
+.ability-tips-body.accent-crimson .ability-tips-icon {
+  background: linear-gradient(#f0b4a6, #d27a68);
+  color: #5c2418;
+}
+.ability-tips-body.accent-slate .ability-tips-icon {
+  background: linear-gradient(#d5dbe3, #9aa5b2);
+  color: #2f3740;
+}
+.ability-tips-body.accent-sky .ability-tips-icon {
+  background: linear-gradient(#b9d8ef, #7eafd0);
+  color: #1d3f55;
+}
+.ability-tips-body.accent-rose .ability-tips-icon {
+  background: linear-gradient(#efc0cd, #d4899d);
+  color: #5a2435;
+}
+.ability-tips-body.accent-moss .ability-tips-icon {
+  background: linear-gradient(#d5e6b8, #9bb574);
+  color: #2f451c;
+}
+
+.ability-tips-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ability-tips-level {
+  color: #6f5b48;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.ability-tips-effect {
+  color: var(--green-dark);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.ability-tips-copy p {
+  margin: 0;
+  color: #78675a;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ability-tips-body > button {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
 
 .hero-card-grid {
   display: grid;
