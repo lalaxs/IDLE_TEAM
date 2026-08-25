@@ -12,3 +12,6 @@ __pycache__/
 idle/
 *.pid
 nav-check.png
+
+# Art pipeline intermediates (chroma/master/review). Runtime game art lives in public/assets/.
+docs/art/generated/
