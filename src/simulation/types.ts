@@ -38,9 +38,51 @@ export type HeroId =
   | "H37"
   | "H38"
   | "H39"
-  | "H40";
+  | "H40"
+  | "H41"
+  | "H42"
+  | "H43"
+  | "H44"
+  | "H45"
+  | "H46"
+  | "H47"
+  | "H48"
+  | "H49"
+  | "H50"
+  | "H51"
+  | "H52"
+  | "H53"
+  | "H54"
+  | "H55"
+  | "H56"
+  | "H57"
+  | "H58"
+  | "H59"
+  | "H60"
+  | "H61"
+  | "H62"
+  | "H63"
+  | "H64"
+  | "H65"
+  | "H66"
+  | "H67"
+  | "H68"
+  | "H69"
+  | "H70"
+  | "H71"
+  | "H72"
+  | "H73"
+  | "H74"
+  | "H75"
+  | "H76"
+  | "H77"
+  | "H78"
+  | "H79"
+  | "H80";
 
-export type EnemyId = "E01" | "E02" | "E03" | "E04" | "B01";
+export type EnemyId =
+  | "E01" | "E02" | "E03" | "E04" | "E05" | "E06" | "E07" | "E08"
+  | "B01" | "B02" | "B03" | "B04" | "B05" | "B06" | "B07" | "B08";
 export type DamageElement = "physical" | "fire" | "frost" | "lightning" | "dark" | "holy";
 export type Team = "heroes" | "enemies";
 export type TargetStrategy =

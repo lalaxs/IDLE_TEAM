@@ -11,7 +11,8 @@ describe("wave generation", () => {
   it("adds stage-scaled normal enemies, elite, boss, and late escorts", () => {
     expect(createWaveDefinitions(1, 1, 1)).toHaveLength(3);
     expect(createWaveDefinitions(4, 2, 1).some(({ enemyId }) => enemyId === "E04")).toBe(true);
-    expect(createWaveDefinitions(7, 3, 1).map(({ enemyId }) => enemyId)).toEqual(["B01", expect.any(String)]);
+    expect(createWaveDefinitions(7, 3, 1).map(({ enemyId }) => enemyId)).toEqual(["B07", expect.any(String)]);
+    expect(createWaveDefinitions(1, 3, 1)[0]?.enemyId).toBe("B01");
     expect(createWaveDefinitions(10, 3, 1)).toHaveLength(3);
   });
 

@@ -27,7 +27,7 @@ const foregroundBackgrounds = {
 } as const;
 
 const heroCharacters = Object.fromEntries(
-  Array.from({ length: 40 }, (_, index) => {
+  Array.from({ length: 80 }, (_, index) => {
     const id = `H${String(index + 1).padStart(2, "0")}` as HeroId;
     const file = `hero-h${String(index + 1).padStart(2, "0")}.webp`;
     return [id, `/assets/characters/${file}`] as const;
@@ -41,7 +41,18 @@ export const ASSET_MANIFEST = {
     E02: "/assets/characters/enemy-e02.png",
     E03: "/assets/characters/enemy-e03.png",
     E04: "/assets/characters/enemy-e04.png",
+    E05: "/assets/characters/enemy-e05.png",
+    E06: "/assets/characters/enemy-e06.png",
+    E07: "/assets/characters/enemy-e07.png",
+    E08: "/assets/characters/enemy-e08.png",
     B01: "/assets/characters/enemy-b01.png",
+    B02: "/assets/characters/enemy-b02.png",
+    B03: "/assets/characters/enemy-b03.png",
+    B04: "/assets/characters/enemy-b04.png",
+    B05: "/assets/characters/enemy-b05.png",
+    B06: "/assets/characters/enemy-b06.png",
+    B07: "/assets/characters/enemy-b07.png",
+    B08: "/assets/characters/enemy-b08.png",
   },
   backgrounds: {
     stages: stageBackgrounds,

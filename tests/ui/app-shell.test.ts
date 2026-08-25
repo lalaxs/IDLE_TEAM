@@ -782,7 +782,7 @@ describe("AppShell", () => {
     store.dispatch({ type: "tutorial:complete" });
     store.dispatch({ type: "ui:selectTab", tab: "heroes" });
     const cards = root.querySelectorAll(".hero-card");
-    expect(cards).toHaveLength(40);
+    expect(cards).toHaveLength(80);
     const first = cards[0]!;
     expect(first.querySelector(".hero-card-art img")?.getAttribute("src")).toBe(
       "/assets/characters/hero-h01.webp",
@@ -997,7 +997,7 @@ describe("AppShell", () => {
     card!.click();
     expect(root.querySelector(".center-sheet.dispatch-modal")).not.toBeNull();
     expect(root.querySelector(".bottom-sheet")).toBeNull();
-    expect(root.querySelectorAll(".dispatch-picker .hero-card")).toHaveLength(40);
+    expect(root.querySelectorAll(".dispatch-picker .hero-card")).toHaveLength(80);
     expect(root.querySelector('.dispatch-picker [data-hero-id="H01"]')?.hasAttribute("disabled")).toBe(true);
     expect(root.querySelector('.dispatch-picker [data-hero-id="H01"]')?.textContent).toContain("主线中");
     expect(root.querySelector('[data-action="dispatch-pick"][data-hero-id="H01"]')).toBeNull();

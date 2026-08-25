@@ -349,7 +349,7 @@ export class BattleSimulation {
         // Only skip the auto-attack when a skill actually resolved this tick.
         if (skillEvents.some((event) => event.type === "skill:resolved")) continue;
       }
-      if (unit.sourceId === "B01" && unit.skillCooldownMs <= 0) {
+      if (ENEMY_BY_ID[unit.sourceId as keyof typeof ENEMY_BY_ID]?.kind === "boss" && unit.skillCooldownMs <= 0) {
         this.castBossSkill(unit);
         continue;
       }
@@ -372,7 +372,7 @@ export class BattleSimulation {
     if (enemy.team !== "enemies") return;
     const kind = ENEMY_BY_ID[enemy.sourceId as keyof typeof ENEMY_BY_ID]?.kind ?? "normal";
     this.events.push({ type: "enemy:killed", kind });
-    if (this.bossActive || enemy.sourceId === "B01") return;
+    if (this.bossActive || ENEMY_BY_ID[enemy.sourceId as keyof typeof ENEMY_BY_ID]?.kind === "boss") return;
     if (this.trashKills >= this.trashQuota) return;
     this.trashKills += 1;
     this.events.push({ type: "boss:progress", progress: this.bossProgress });
@@ -515,7 +515,10 @@ export class BattleSimulation {
     ) {
       applyStatus(source, { kind: "haste", magnitude: 0.2, remainingMs: 2500, sourceId: source.id });
     }
-    if (source.sourceId === "E04" && source.basicAttackCount % 4 === 0) {
+    if (
+      ENEMY_BY_ID[source.sourceId as keyof typeof ENEMY_BY_ID]?.kind === "elite" &&
+      source.basicAttackCount % 4 === 0
+    ) {
       applyStatus(source, { kind: "damageReduction", magnitude: 0.2, remainingMs: 2000, sourceId: source.id });
     }
   }

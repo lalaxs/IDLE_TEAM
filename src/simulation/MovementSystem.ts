@@ -1,6 +1,7 @@
+import { ENEMY_BY_ID } from "../content/enemies";
 import { getStatusMagnitude, isStunned } from "./StatusSystem";
 import { selectTarget } from "./TargetingSystem";
-import type { BattleEvent, UnitState } from "./types";
+import type { BattleEvent, EnemyId, UnitState } from "./types";
 
 /** Ally footprint gap along world X — close enough to allow formation ranks to settle. */
 const HERO_GAP = 64;
@@ -61,7 +62,8 @@ export function isPlantedForAttack(unit: UnitState, units: readonly UnitState[])
 /** Stop / strike distance. Melee gets contact padding so art does not overlap. */
 export function engageRange(unit: UnitState): number {
   if (unit.attackRange > 140) return unit.attackRange;
-  const body = unit.sourceId === "B01" ? MELEE_CONTACT + 12 : MELEE_CONTACT;
+  const body =
+    ENEMY_BY_ID[unit.sourceId as EnemyId]?.kind === "boss" ? MELEE_CONTACT + 12 : MELEE_CONTACT;
   return unit.attackRange + body;
 }
 

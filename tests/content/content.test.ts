@@ -19,11 +19,11 @@ import { SeededRandom } from "../../src/simulation/RandomSource";
 const LEGACY_SLOTS = ["main_weapon", "armor", "amulet"] as const;
 
 describe("approved content manifest", () => {
-  it("ships forty differentiated heroes and skills", () => {
-    expect(HERO_DEFINITIONS).toHaveLength(40);
-    expect(new Set(HERO_DEFINITIONS.map(({ id }) => id)).size).toBe(40);
-    expect(ACTIVE_SKILLS).toHaveLength(40);
-    expect(PASSIVE_SKILLS).toHaveLength(40);
+  it("ships eighty differentiated heroes and skills", () => {
+    expect(HERO_DEFINITIONS).toHaveLength(80);
+    expect(new Set(HERO_DEFINITIONS.map(({ id }) => id)).size).toBe(80);
+    expect(ACTIVE_SKILLS).toHaveLength(80);
+    expect(PASSIVE_SKILLS).toHaveLength(80);
     expect(HERO_SKILLS).toHaveLength(8);
     expect(new Set(HERO_SKILLS.map(({ id }) => id)).size).toBe(8);
     expect(TALENT_NODES).toHaveLength(18);
@@ -40,8 +40,8 @@ describe("approved content manifest", () => {
     expect(HERO_DEFINITIONS.find(({ id }) => id === "H07")?.damageElement).toBe("frost");
     expect(HERO_DEFINITIONS.find(({ id }) => id === "H08")?.damageElement).toBe("lightning");
     expect(HERO_DEFINITIONS.find(({ id }) => id === "H06")?.damageElement).toBe("dark");
-    expect(HERO_DAMAGE_IDENTITIES).toHaveLength(40);
-    expect(new Set(HERO_DAMAGE_IDENTITIES.map(({ id }) => id)).size).toBe(40);
+    expect(HERO_DAMAGE_IDENTITIES).toHaveLength(80);
+    expect(new Set(HERO_DAMAGE_IDENTITIES.map(({ id }) => id)).size).toBe(80);
     for (const hero of HERO_DEFINITIONS) {
       const identity = HERO_DAMAGE_IDENTITIES.find(({ id }) => id === hero.id);
       expect(identity?.damageSchool).toBe(hero.damageSchool);
@@ -59,7 +59,7 @@ describe("approved content manifest", () => {
   });
 
   it("ships ten chapters, enemies, equipment bands, and traits", () => {
-    expect(ENEMY_DEFINITIONS).toHaveLength(5);
+    expect(ENEMY_DEFINITIONS).toHaveLength(16);
     expect(STAGE_DEFINITIONS).toHaveLength(MAX_STAGE);
     expect(STAGE_DEFINITIONS[STAGE_DEFINITIONS.length - 1]?.id).toBe("10-12");
     expect(ITEM_DEFINITIONS.length).toBeGreaterThanOrEqual(240);

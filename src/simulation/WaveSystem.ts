@@ -1,4 +1,10 @@
-import { ENEMY_BY_ID, resolveEnemyDamageElement } from "../content/enemies";
+import {
+  ENEMY_BY_ID,
+  NORMAL_ENEMY_IDS,
+  ELITE_ENEMY_IDS,
+  bossIdForStage,
+  resolveEnemyDamageElement,
+} from "../content/enemies";
 import {
   enemyAtkMultiplier,
   enemyDefMultiplier,
@@ -34,6 +40,17 @@ export function createEncounterDefinitions(
   return createWaveDefinitions(stage, patternWave, seed);
 }
 
+function availableNormals(stage: number): EnemyId[] {
+  const unlocked = Math.min(NORMAL_ENEMY_IDS.length, 1 + Math.floor((stage - 1) / 2));
+  return NORMAL_ENEMY_IDS.slice(0, unlocked);
+}
+
+function availableElites(stage: number): EnemyId[] {
+  if (stage < 4) return [];
+  const unlocked = Math.min(ELITE_ENEMY_IDS.length, 1 + Math.floor((stage - 4) / 6));
+  return ELITE_ENEMY_IDS.slice(0, unlocked);
+}
+
 export function createWaveDefinitions(
   stage: number,
   wave: number,
@@ -42,11 +59,9 @@ export function createWaveDefinitions(
   if (wave === 3) {
     const escorts = stage >= 10 ? 2 : stage >= 7 ? 1 : 0;
     const random = new SeededRandom(seed + stage * 101 + wave);
-    const available: EnemyId[] = ["E01"];
-    if (stage >= 2) available.push("E02");
-    if (stage >= 3) available.push("E03");
+    const available = availableNormals(stage);
     return [
-      { enemyId: "B01", scale: stage },
+      { enemyId: bossIdForStage(stage), scale: stage },
       ...Array.from({ length: escorts }, () => ({
         enemyId: random.pick(available),
         scale: stage,
@@ -57,16 +72,20 @@ export function createWaveDefinitions(
   const baseCount = 3 + Math.floor((stage - 1) / 4);
   const count = baseCount + (wave === 2 ? 1 : 0);
   const random = new SeededRandom(seed + stage * 101 + wave);
-  const available: EnemyId[] = ["E01"];
-  if (stage >= 2) available.push("E02");
-  if (stage >= 3) available.push("E03");
-  const normalCount = wave === 2 && stage >= 4 ? count - 1 : count;
+  const available = availableNormals(stage);
+  const elites = availableElites(stage);
+  const useElite = wave === 2 && elites.length > 0;
+  const normalCount = useElite ? count - 1 : count;
   const result = Array.from({ length: normalCount }, () => ({
     enemyId: random.pick(available),
     scale: stage,
   }));
-  if (wave === 2 && stage >= 4) result.push({ enemyId: "E04", scale: stage });
+  if (useElite) result.push({ enemyId: random.pick(elites), scale: stage });
   return result;
+}
+
+function isBossId(enemyId: EnemyId): boolean {
+  return ENEMY_BY_ID[enemyId]?.kind === "boss";
 }
 
 /** DI-style asymmetric scaling: HP rises faster than attack. */
@@ -100,7 +119,7 @@ export function createEnemyUnits(
       moveSpeed: definition.moveSpeed,
       attackIntervalMs: definition.attackIntervalMs,
       attackCooldownMs: 500 + index * 120,
-      skillCooldownMs: enemyId === "B01" ? 5000 : Number.POSITIVE_INFINITY,
+      skillCooldownMs: isBossId(enemyId) ? 5000 : Number.POSITIVE_INFINITY,
       ultimateCooldownMs: Number.POSITIVE_INFINITY,
       targetId: null,
       shield: 0,
