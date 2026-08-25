@@ -15,6 +15,7 @@ export type AbilityAccent =
 export type AbilityId =
   | "gold_flat"
   | "gold_percent"
+  | "gold_drop_chance"
   | "exp_flat"
   | "exp_percent"
   | "hero_attack"
@@ -71,28 +72,40 @@ export const ABILITY_DEFINITIONS: readonly AbilityDefinition[] = [
     active: true,
   },
   {
+    id: "gold_drop_chance",
+    name: "金币掉落几率",
+    blurb: "每级金币掉落几率 +1%（基础 15%）",
+    icon: "◉",
+    accent: "gold",
+    category: "economy",
+    maxLevel: 10,
+    perLevel: 1,
+    unit: "percent",
+    active: true,
+  },
+  {
     id: "exp_flat",
     name: "经验货币掉落固定值",
-    blurb: "每级经验货币 +10（即将生效）",
-    icon: "◆",
+    blurb: "每级通关经验 +10",
+    icon: "✧",
     accent: "teal",
     category: "economy",
     maxLevel: 50,
     perLevel: 10,
     unit: "flat",
-    active: false,
+    active: true,
   },
   {
     id: "exp_percent",
     name: "经验货币掉落百分比",
-    blurb: "每级经验货币 +1%（即将生效）",
+    blurb: "每级通关经验 +1%",
     icon: "◇",
     accent: "violet",
     category: "economy",
     maxLevel: 50,
     perLevel: 1,
     unit: "percent",
-    active: false,
+    active: true,
   },
   {
     id: "hero_attack",
@@ -193,14 +206,14 @@ export const ABILITY_DEFINITIONS: readonly AbilityDefinition[] = [
   {
     id: "offline_exp_percent",
     name: "离线经验货币获取",
-    blurb: "每级离线经验货币 +2%（即将生效）",
+    blurb: "每级离线经验 +2%",
     icon: "✧",
     accent: "teal",
     category: "general",
     maxLevel: 50,
     perLevel: 2,
     unit: "percent",
-    active: false,
+    active: true,
   },
   {
     id: "offline_gold_percent",

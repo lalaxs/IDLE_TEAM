@@ -10,7 +10,6 @@ import {
 export interface OfflineReward {
   minutes: number;
   gold: number;
-  /** Reserved for upcoming experience currency. */
   exp: number;
   gearCount: number;
 }
@@ -22,7 +21,9 @@ export function calculateOfflineReward(
   abilities?: AbilityLevels,
 ): OfflineReward {
   const rawMinutes = Math.floor(elapsedMs / 60_000);
-  if (rawMinutes < 5 || highestStage < 3) return { minutes: 0, gold: 0, exp: 0, gearCount: 0 };
+  if (rawMinutes < 5 || highestStage < 3) {
+    return { minutes: 0, gold: 0, exp: 0, gearCount: 0 };
+  }
   const minutes = Math.min(480, rawMinutes);
   const baseGold = (20 + highestStage * 12) * minutes;
   const gold = abilities ? applyOfflineGoldAbilityBonus(baseGold, abilities) : baseGold;

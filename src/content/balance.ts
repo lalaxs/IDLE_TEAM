@@ -29,12 +29,14 @@ export const BASE_TIER_MULTIPLIER: Record<1 | 2 | 3 | 4, number> = {
   4: 1.48,
 };
 
-/** Hero level curves — weaker than gear (DI character vs item power). */
-export const HERO_HP_PER_LEVEL = 1.095;
-export const HERO_ATK_PER_LEVEL = 1.085;
-export const HERO_DEF_PER_LEVEL = 1.08;
-export const HERO_UPGRADE_COST_BASE = 80;
-export const HERO_UPGRADE_COST_GROWTH = 1.48;
+/** Hero level curves for 100 levels — weaker than gear (DI character vs item power). */
+export const HERO_HP_PER_LEVEL = 1.026;
+export const HERO_ATK_PER_LEVEL = 1.023;
+export const HERO_DEF_PER_LEVEL = 1.02;
+export const HERO_UPGRADE_COST_BASE = 60;
+export const HERO_UPGRADE_COST_GROWTH = 1.085;
+export const MAX_HERO_LEVEL = 100;
+export const HERO_LEVELS_PER_ASCEND = 20;
 
 /** Soft armor: damage = atk² / (atk + def × factor). */
 export const ARMOR_FACTOR = 1.25;
@@ -111,6 +113,9 @@ export interface HeroSkillCombat {
   slowMs?: number;
   hasteMagnitude?: number;
   hasteMs?: number;
+  teamDamageReduction?: number;
+  teamDamageReductionMs?: number;
+  selfShieldMaxHpRatio?: number;
 }
 
 /**
@@ -161,6 +166,58 @@ export const HERO_SKILL_COMBAT: Record<HeroId, HeroSkillCombat> = {
     hits: [{ multiplier: 1.25 }],
     chainDecay: 0.78,
     chainMaxTargets: 3,
+    hasteMagnitude: 0.1,
+    hasteMs: 3000,
+  },
+};
+
+/** Ascend-1 ultimates: 10–13s, ~300–420% attack equivalent. */
+export const HERO_ULTIMATE_COMBAT: Record<HeroId, HeroSkillCombat> = {
+  H01: {
+    cooldownMs: 12000,
+    hits: [{ multiplier: 2.2 }],
+    selfShieldMaxHpRatio: 0.18,
+    teamDamageReduction: 0.12,
+    teamDamageReductionMs: 4000,
+  },
+  H02: {
+    cooldownMs: 11000,
+    hits: [{ multiplier: 1.1 }, { multiplier: 1.1 }, { multiplier: 1.1 }],
+    aoeRadius: 90,
+  },
+  H03: {
+    cooldownMs: 13000,
+    hits: [{ multiplier: 3.0 }],
+    aoeRadius: 140,
+  },
+  H04: {
+    cooldownMs: 12000,
+    hits: [],
+    healAttackMultiplier: 2.2,
+    healMaxHpRatio: 0.1,
+  },
+  H05: {
+    cooldownMs: 12000,
+    hits: [{ multiplier: 1.4 }],
+    chainMaxTargets: 4,
+  },
+  H06: {
+    cooldownMs: 11000,
+    hits: [{ multiplier: 0.9 }, { multiplier: 0.9 }, { multiplier: 0.9 }, { multiplier: 0.9 }],
+  },
+  H07: {
+    cooldownMs: 13000,
+    hits: [{ multiplier: 2.4 }],
+    aoeRadius: 130,
+    slowMagnitude: 0.45,
+    slowMs: 4000,
+  },
+  H08: {
+    cooldownMs: 12000,
+    hits: [{ multiplier: 1.25 }],
+    chainDecay: 0.78,
+    chainMaxTargets: 5,
+    stunMs: 600,
     hasteMagnitude: 0.1,
     hasteMs: 3000,
   },

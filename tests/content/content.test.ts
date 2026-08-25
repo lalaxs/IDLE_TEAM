@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ENEMY_DEFINITIONS } from "../../src/content/enemies";
+import { HERO_DAMAGE_IDENTITIES } from "../../src/content/heroDamageIdentities";
 import { HERO_DEFINITIONS } from "../../src/content/heroes";
 import {
   EQUIPMENT_SLOTS,
@@ -7,8 +8,11 @@ import {
   TRAIT_DEFINITIONS,
 } from "../../src/content/items";
 import { ACTIVE_SKILLS, PASSIVE_SKILLS } from "../../src/content/skills";
+import { HERO_SKILLS } from "../../src/content/heroSkills";
+import { TALENT_NODES } from "../../src/content/talents";
 import { STAGE_DEFINITIONS } from "../../src/content/stages";
 import { MAX_STAGE } from "../../src/content/chapters";
+import { DAMAGE_SCHOOL_LABEL, formatHeroDamageIdentity } from "../../src/content/damageElements";
 import { selectEquipmentDefinition } from "../../src/progression/EquipmentPool";
 import { SeededRandom } from "../../src/simulation/RandomSource";
 
@@ -20,10 +24,37 @@ describe("approved content manifest", () => {
     expect(new Set(HERO_DEFINITIONS.map(({ id }) => id)).size).toBe(8);
     expect(ACTIVE_SKILLS).toHaveLength(8);
     expect(PASSIVE_SKILLS).toHaveLength(8);
+    expect(HERO_SKILLS).toHaveLength(8);
+    expect(new Set(HERO_SKILLS.map(({ id }) => id)).size).toBe(8);
+    expect(TALENT_NODES).toHaveLength(18);
+    expect(new Set(TALENT_NODES.map(({ id }) => id)).size).toBe(18);
     for (const hero of HERO_DEFINITIONS) {
       expect(ACTIVE_SKILLS.some(({ heroId }) => heroId === hero.id)).toBe(true);
       expect(PASSIVE_SKILLS.some(({ heroId }) => heroId === hero.id)).toBe(true);
+      expect(["physical", "magic"]).toContain(hero.damageSchool);
+      expect(["physical", "fire", "frost", "lightning", "dark", "holy"]).toContain(hero.damageElement);
     }
+    expect(HERO_DEFINITIONS.find(({ id }) => id === "H03")?.damageElement).toBe("fire");
+    expect(HERO_DEFINITIONS.find(({ id }) => id === "H04")?.damageElement).toBe("holy");
+    expect(HERO_DEFINITIONS.find(({ id }) => id === "H07")?.damageElement).toBe("frost");
+    expect(HERO_DEFINITIONS.find(({ id }) => id === "H08")?.damageElement).toBe("lightning");
+    expect(HERO_DEFINITIONS.find(({ id }) => id === "H06")?.damageElement).toBe("dark");
+    expect(HERO_DAMAGE_IDENTITIES).toHaveLength(40);
+    expect(new Set(HERO_DAMAGE_IDENTITIES.map(({ id }) => id)).size).toBe(40);
+    for (const hero of HERO_DEFINITIONS) {
+      const identity = HERO_DAMAGE_IDENTITIES.find(({ id }) => id === hero.id);
+      expect(identity?.damageSchool).toBe(hero.damageSchool);
+      expect(identity?.damageElement).toBe(hero.damageElement);
+    }
+    expect(formatHeroDamageIdentity("magic", "fire")).toBe("火焰魔法");
+    expect(formatHeroDamageIdentity("magic", "frost")).toBe("冰霜魔法");
+    expect(formatHeroDamageIdentity("magic", "lightning")).toBe("雷电魔法");
+    expect(formatHeroDamageIdentity("magic", "holy")).toBe("圣光魔法");
+    expect(formatHeroDamageIdentity("physical", "dark")).toBe("暗黑");
+    expect(formatHeroDamageIdentity("physical", "physical")).toBe("物理");
+    expect(formatHeroDamageIdentity("magic", "physical")).toBe("魔法");
+    expect(DAMAGE_SCHOOL_LABEL.physical).toBe("物理");
+    expect(DAMAGE_SCHOOL_LABEL.magic).toBe("魔法");
   });
 
   it("ships ten chapters, enemies, equipment bands, and traits", () => {

@@ -43,13 +43,66 @@ describe("GameStore meta loop", () => {
     ).toThrow("duplicate");
   });
 
-  it("levels a hero only when there is enough gold", () => {
+  it("levels a hero only when there is enough experience", () => {
     const save = createDefaultSave();
-    save.gold = 80;
+    save.exp = 60;
+    save.gold = 0;
     const store = new GameStore(save);
     store.dispatch({ type: "hero:levelUp", heroId: "H01" });
     expect(store.getState().save.roster.H01?.level).toBe(2);
-    expect(store.getState().save.gold).toBe(0);
+    expect(store.getState().save.exp).toBe(0);
+  });
+
+  it("ascends a max-star hero at the level cap, then resets stars", () => {
+    const save = createDefaultSave();
+    save.roster.H01.stars = 5;
+    save.roster.H01.ascendLevel = 0;
+    save.roster.H01.level = 20;
+    save.roster.H01.starFlatHp = 120;
+    save.materials.mat_ascend_stone = 3;
+    const store = new GameStore(save);
+    store.dispatch({ type: "hero:ascend", heroId: "H01" });
+    expect(store.getState().save.roster.H01.ascendLevel).toBe(1);
+    expect(store.getState().save.roster.H01.stars).toBe(0);
+    expect(store.getState().save.roster.H01.starFlatHp).toBe(120);
+    expect(store.getState().save.materials.mat_ascend_stone).toBe(2);
+    store.dispatch({ type: "hero:ascend", heroId: "H01" });
+    expect(store.getState().save.roster.H01.ascendLevel).toBe(1);
+  });
+
+  it("rejects ascend before max stars", () => {
+    const save = createDefaultSave();
+    save.roster.H01.stars = 4;
+    save.roster.H01.ascendLevel = 0;
+    save.roster.H01.level = 20;
+    save.materials.mat_ascend_stone = 3;
+    const store = new GameStore(save);
+    store.dispatch({ type: "hero:ascend", heroId: "H01" });
+    expect(store.getState().save.roster.H01.ascendLevel).toBe(0);
+    expect(store.getState().save.materials.mat_ascend_stone).toBe(3);
+  });
+
+  it("rejects ascend before the current level cap", () => {
+    const save = createDefaultSave();
+    save.roster.H01.stars = 5;
+    save.roster.H01.ascendLevel = 0;
+    save.roster.H01.level = 19;
+    save.materials.mat_ascend_stone = 3;
+    const store = new GameStore(save);
+    store.dispatch({ type: "hero:ascend", heroId: "H01" });
+    expect(store.getState().save.roster.H01.ascendLevel).toBe(0);
+  });
+
+  it("writes permanent star flats on star-up", () => {
+    const save = createDefaultSave();
+    save.roster.H06.marks = 20;
+    save.roster.H06.stars = 0;
+    save.roster.H06.ascendLevel = 0;
+    const store = new GameStore(save);
+    store.dispatch({ type: "hero:starUp", heroId: "H06" });
+    expect(store.getState().save.roster.H06.stars).toBe(1);
+    expect(store.getState().save.roster.H06.starFlatHp).toBeGreaterThan(0);
+    expect(store.getState().save.roster.H06.starFlatAtk).toBeGreaterThan(0);
   });
 
   it("keeps equipped item data available for combat stat calculation", () => {
@@ -80,8 +133,9 @@ describe("GameStore meta loop", () => {
     const save = createDefaultSave();
     const item = createEquipment("armor_scale_vest", 3, "uncommon", new SeededRandom(4));
     const store = new GameStore(save);
-    store.dispatch({ type: "offline:claim", gold: 500, items: [item] });
+    store.dispatch({ type: "offline:claim", gold: 500, exp: 200, items: [item] });
     expect(store.getState().save.gold).toBe(500);
+    expect(store.getState().save.exp).toBe(createDefaultSave().exp + 200);
     expect(store.getState().save.inventory).toContainEqual(item);
     expect(store.getState().save.highestClearedStage).toBe(0);
   });
@@ -187,7 +241,7 @@ describe("GameStore meta loop", () => {
     save.highestUnlockedStage = 23;
     save.highestClearedStage = 22;
     const store = new GameStore(save);
-    store.dispatch({ type: "stage:victory", stage: 23, gold: 0, items: [] });
+    store.dispatch({ type: "stage:victory", stage: 23, gold: 0, exp: 0, items: [] });
     expect(store.getState().save.currentStage).toBe(24);
     expect(store.getState().save.highestUnlockedStage).toBe(24);
     store.dispatch({ type: "stage:select", stage: 24 });
@@ -200,7 +254,7 @@ describe("GameStore meta loop", () => {
     save.highestUnlockedStage = 35;
     save.highestClearedStage = 34;
     const store = new GameStore(save);
-    store.dispatch({ type: "stage:victory", stage: 35, gold: 0, items: [] });
+    store.dispatch({ type: "stage:victory", stage: 35, gold: 0, exp: 0, items: [] });
     expect(store.getState().save.currentStage).toBe(36);
     expect(store.getState().save.highestUnlockedStage).toBe(36);
     store.dispatch({ type: "stage:select", stage: 36 });
@@ -213,10 +267,20 @@ describe("GameStore meta loop", () => {
     save.highestUnlockedStage = 47;
     save.highestClearedStage = 46;
     const store = new GameStore(save);
-    store.dispatch({ type: "stage:victory", stage: 47, gold: 0, items: [] });
+    store.dispatch({ type: "stage:victory", stage: 47, gold: 0, exp: 0, items: [] });
     expect(store.getState().save.currentStage).toBe(48);
     expect(store.getState().save.highestUnlockedStage).toBe(48);
     store.dispatch({ type: "stage:select", stage: 48 });
     expect(store.getState().save.currentStage).toBe(48);
+  });
+
+  it("spends talent points and unlocks a shared hero skill at 20", () => {
+    const save = createDefaultSave();
+    save.roster.H01.level = 20;
+    const store = new GameStore(save);
+    store.dispatch({ type: "hero:talentUp", heroId: "H01", talentId: "might_attack" });
+    expect(store.getState().save.roster.H01.talentRanks.might_attack).toBe(1);
+    store.dispatch({ type: "hero:chooseSkill", heroId: "H01", skillId: "iron-wall" });
+    expect(store.getState().save.roster.H01.chosenSkillId).toBe("iron-wall");
   });
 });

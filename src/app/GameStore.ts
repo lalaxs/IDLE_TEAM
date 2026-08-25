@@ -1,6 +1,21 @@
 import type { AppTab, GameAction } from "./actions";
 import type { AppEvent, SummonPullResult } from "./events";
-import { getStarUpgradeCost, getUpgradeCost, MAX_HERO_STARS } from "../progression/HeroProgression";
+import {
+  canAscendHero,
+  getAscendStoneCost,
+  getHeroLevelCap,
+  getStarFlatDelta,
+  getStarUpgradeCost,
+  getUpgradeCost,
+  MAX_HERO_ASCEND_LEVEL,
+  MAX_HERO_STARS,
+} from "../progression/HeroProgression";
+import { isHeroSkillId } from "../content/heroSkills";
+import {
+  canLearnHeroSkill,
+  talentUpgradeBlocked,
+  upgradeTalent,
+} from "../progression/TalentSystem";
 import {
   collectEquippedItemIds,
   getItemScore,
@@ -9,8 +24,28 @@ import {
   sortInventoryItems,
 } from "../progression/EquipmentSystem";
 import { craftAlchemyItem } from "../progression/AlchemySystem";
+import {
+  inlayGem,
+  openEquipmentSocket,
+  removeGem,
+  resetEquipmentAffix,
+  smeltEquipmentAffix,
+} from "../progression/GearCraftSystem";
 import { RARITY_LABELS } from "../content/rarities";
+import { AFFIX_BY_ID, formatAffixValue } from "../content/affixes";
+import { MATERIAL_BY_ID } from "../content/materials";
+import { DUNGEON_BY_ID } from "../content/dungeons";
 import { createShopOffers } from "../progression/ShopSystem";
+import { getDateKey } from "../persistence/schema";
+import {
+  fillEmptyParty,
+  getBusyHeroIds,
+  getDungeonRun,
+  isDungeonRunReady,
+  removeHeroesFromParty,
+  rollDungeonRewards,
+  validateDungeonDispatch,
+} from "../progression/DungeonSystem";
 import {
   getAbilityUpgradeCost,
   getBackpackCapacity,
@@ -18,7 +53,9 @@ import {
 } from "../progression/AbilitySystem";
 import {
   applyLootChestCharge,
+  canOpenLootChest,
   getLootChestProgress,
+  openLootChest,
 } from "../progression/LootChestSystem";
 import { ABILITY_BY_ID } from "../content/abilities";
 import { SeededRandom } from "../simulation/RandomSource";
@@ -81,28 +118,93 @@ export class GameStore {
       if (heroes.length === 0) throw new Error("Party must keep at least one hero");
       if (new Set(heroes).size !== heroes.length) throw new Error("Party contains duplicate heroes");
       if (heroes.some((id) => !save.roster[id].unlocked)) throw new Error("Party contains locked hero");
-      save.party = [...action.party];
+      if (heroes.some((id) => getBusyHeroIds(save.dungeonRuns).has(id))) {
+        events.push({ type: "toast", message: "该英雄正在副本中" });
+      } else {
+        save.party = [...action.party];
+      }
     } else if (action.type === "hero:levelUp") {
       const progress = save.roster[action.heroId];
+      const cap = getHeroLevelCap(progress.ascendLevel ?? 0);
       const cost = getUpgradeCost(progress.level);
-      if (progress.level < 20 && save.gold >= cost) {
-        save.gold -= cost;
+      if (progress.level >= cap) {
+        events.push({ type: "toast", message: progress.level >= 100 ? "英雄已达等级上限" : "需进阶后继续升级" });
+      } else if (save.exp < cost) {
+        events.push({ type: "toast", message: "经验不足" });
+      } else {
+        save.exp -= cost;
         progress.level += 1;
         events.push({ type: "hero:leveled", heroId: action.heroId, level: progress.level });
-      } else {
-        events.push({ type: "toast", message: progress.level >= 20 ? "英雄已达等级上限" : "金币不足" });
       }
     } else if (action.type === "hero:starUp") {
       const progress = save.roster[action.heroId];
-      const cost = getStarUpgradeCost(progress.stars);
+      const cost = getStarUpgradeCost(progress.stars, progress.ascendLevel ?? 0);
       if (cost == null || progress.stars >= MAX_HERO_STARS) {
         events.push({ type: "toast", message: "星级已达上限" });
       } else if (progress.marks < cost) {
         events.push({ type: "toast", message: "碎片不足" });
       } else {
+        const delta = getStarFlatDelta(action.heroId, progress.level);
         progress.marks -= cost;
         progress.stars += 1;
+        progress.starFlatHp = (progress.starFlatHp ?? 0) + delta.maxHp;
+        progress.starFlatAtk = (progress.starFlatAtk ?? 0) + delta.attack;
+        progress.starFlatDef = (progress.starFlatDef ?? 0) + delta.defense;
         events.push({ type: "hero:starred", heroId: action.heroId, stars: progress.stars });
+      }
+    } else if (action.type === "hero:ascend") {
+      const progress = save.roster[action.heroId];
+      const currentLevel = progress.ascendLevel ?? 0;
+      const cost = getAscendStoneCost(currentLevel);
+      if (!progress.unlocked) {
+        events.push({ type: "toast", message: "英雄未解锁" });
+      } else if (!canAscendHero(progress.stars, currentLevel, progress.level) || cost == null) {
+        events.push({
+          type: "toast",
+          message:
+            currentLevel >= MAX_HERO_ASCEND_LEVEL
+              ? "已达最高进阶"
+              : progress.stars < MAX_HERO_STARS
+                ? "需先升至 5 星"
+                : "需先升至当前等级上限",
+        });
+      } else if ((save.materials.mat_ascend_stone ?? 0) < cost) {
+        events.push({ type: "toast", message: "进阶石不足" });
+      } else {
+        save.materials.mat_ascend_stone -= cost;
+        progress.ascendLevel = currentLevel + 1;
+        progress.stars = 0;
+        events.push({ type: "hero:ascended", heroId: action.heroId, level: progress.ascendLevel });
+        this.state.ui.toast = `进阶成功 · ${progress.ascendLevel} 阶`;
+      }
+    } else if (action.type === "hero:talentUp") {
+      const progress = save.roster[action.heroId];
+      if (!progress?.unlocked) {
+        events.push({ type: "toast", message: "英雄未解锁" });
+      } else {
+        const nextRanks = upgradeTalent(progress.talentRanks ?? {}, action.talentId, progress.level);
+        if (!nextRanks) {
+          events.push({
+            type: "toast",
+            message: talentUpgradeBlocked(progress.talentRanks ?? {}, action.talentId, progress.level) ?? "无法升级天赋",
+          });
+        } else {
+          progress.talentRanks = nextRanks;
+          const rank = nextRanks[action.talentId] ?? 0;
+          events.push({ type: "hero:talentUpgraded", heroId: action.heroId, talentId: action.talentId, rank });
+        }
+      }
+    } else if (action.type === "hero:chooseSkill") {
+      const progress = save.roster[action.heroId];
+      if (!progress?.unlocked) {
+        events.push({ type: "toast", message: "英雄未解锁" });
+      } else if (!canLearnHeroSkill(progress.level)) {
+        events.push({ type: "toast", message: "需达到 20 级后选择英雄技能" });
+      } else if (!isHeroSkillId(action.skillId)) {
+        events.push({ type: "toast", message: "无效的英雄技能" });
+      } else {
+        progress.chosenSkillId = action.skillId;
+        events.push({ type: "hero:skillChosen", heroId: action.heroId, skillId: action.skillId });
       }
     } else if (action.type === "item:add") {
       const result = insertInventoryItem(
@@ -129,11 +231,22 @@ export class GameStore {
       events.push({ type: "toast", message: "背包已整理" });
     } else if (action.type === "alchemy:craft") {
       this.craftAlchemy(action.itemIds, events);
+    } else if (action.type === "craft:socket") {
+      this.craftSocket(action.itemId, events);
+    } else if (action.type === "craft:reset") {
+      this.craftReset(action.itemId, action.affixIndex, events);
+    } else if (action.type === "craft:smelt") {
+      this.craftSmelt(action.itemId, action.affixId, events);
+    } else if (action.type === "craft:inlay") {
+      this.craftInlay(action.itemId, action.socketIndex, action.gemId, events);
+    } else if (action.type === "craft:removeGem") {
+      this.craftRemoveGem(action.itemId, action.socketIndex, events);
     } else if (action.type === "stage:select") {
       if (action.stage > save.highestUnlockedStage) throw new Error("Stage is locked");
       save.currentStage = Math.max(1, Math.min(120, action.stage));
     } else if (action.type === "stage:victory") {
       save.gold += action.gold;
+      save.exp += action.exp;
       if (action.stage > save.highestClearedStage) {
         save.highestClearedStage = action.stage;
         save.gems += 20;
@@ -151,6 +264,62 @@ export class GameStore {
         save.inventory = result.inventory;
         save.overflow = result.overflow;
         save.gold += result.goldGained;
+      }
+    } else if (action.type === "dungeon:dispatch") {
+      const dungeon = DUNGEON_BY_ID[action.dungeonId];
+      const dateKey = save.shop.dateKey || getDateKey();
+      const reason = validateDungeonDispatch({
+        dungeonId: action.dungeonId,
+        heroIds: action.heroIds,
+        save,
+        dateKey,
+      });
+      if (reason || !dungeon) {
+        events.push({ type: "toast", message: reason ?? "副本尚未解锁" });
+      } else {
+        const now = Date.now();
+        save.dungeonRuns = [
+          ...save.dungeonRuns,
+          {
+            dungeonId: action.dungeonId,
+            heroIds: [...action.heroIds],
+            startedAt: now,
+            endsAt: now + dungeon.durationMs,
+          },
+        ];
+        const busy = getBusyHeroIds(save.dungeonRuns);
+        save.party = fillEmptyParty(removeHeroesFromParty(save.party, action.heroIds), save.roster, busy);
+        this.state.ui.toast = `派遣出发 · ${dungeon.name}`;
+        events.push({ type: "toast", message: `派遣出发 · ${dungeon.name}` });
+      }
+    } else if (action.type === "dungeon:claim") {
+      const dungeon = DUNGEON_BY_ID[action.dungeonId];
+      const run = getDungeonRun(save.dungeonRuns, action.dungeonId);
+      if (!dungeon || !run) {
+        events.push({ type: "toast", message: "没有可领取的副本" });
+      } else if (!isDungeonRunReady(run)) {
+        events.push({ type: "toast", message: "副本尚未完成" });
+      } else {
+        const rewards = rollDungeonRewards(dungeon, run.startedAt ^ dungeon.powerStage);
+        save.gold += rewards.gold;
+        save.exp += rewards.exp;
+        for (const [materialId, amount] of Object.entries(rewards.materials)) {
+          if (!amount) continue;
+          save.materials[materialId as keyof typeof save.materials] =
+            (save.materials[materialId as keyof typeof save.materials] ?? 0) + amount;
+        }
+        save.dungeonRuns = save.dungeonRuns.filter((entry) => entry.dungeonId !== action.dungeonId);
+        events.push({
+          type: "dungeon:cleared",
+          dungeonId: action.dungeonId,
+          materials: rewards.materials,
+        });
+        const dropSummary = Object.entries(rewards.materials)
+          .filter(([, amount]) => (amount ?? 0) > 0)
+          .map(([id, amount]) => `${MATERIAL_BY_ID[id as keyof typeof MATERIAL_BY_ID]?.name ?? id}×${amount}`)
+          .join(" · ");
+        this.state.ui.toast = dropSummary ? `副本结算 · ${dropSummary}` : "副本结算完成";
+        events.push({ type: "toast", message: this.state.ui.toast });
       }
     } else if (action.type === "summon:single") {
       this.summon(1, 100, events);
@@ -209,30 +378,64 @@ export class GameStore {
         save.lootChest,
         action.amount,
         getChestProgressBonus(save.abilities),
-        Math.max(1, save.highestClearedStage || save.highestUnlockedStage),
       );
       save.lootChest = result.chest;
-      if (result.goldGained > 0) save.gold += result.goldGained;
       events.push({
         type: "lootChest:charged",
         level: result.chest.level,
         progress: getLootChestProgress(result.chest),
+        ready: canOpenLootChest(result.chest),
       });
       if (result.leveledUp) {
+        events.push({ type: "lootChest:leveled", level: result.chest.level });
+      }
+      if (result.becameReady) {
+        events.push({ type: "toast", message: "宝箱已成型，可随时开启" });
+      }
+    } else if (action.type === "lootChest:open") {
+      const dropStage = Math.max(1, save.highestClearedStage || 1);
+      const seed =
+        (save.lootChest.level * 97_531 +
+          save.lootChest.charge * 1_009 +
+          dropStage * 17 +
+          save.gold +
+          save.inventory.length * 13) >>>
+        0;
+      const result = openLootChest(save.lootChest, dropStage, seed || 1);
+      if (!result.ok) {
+        events.push({ type: "toast", message: "宝箱仍是空的，先充能到 1 级" });
+      } else {
+        // Opening always resets both tier and charge progress.
+        save.lootChest = { level: 0, charge: 0 };
+        save.gold += result.gold;
+        save.exp += result.exp;
+        for (const item of result.items) {
+          const inserted = insertInventoryItem(
+            save.inventory,
+            save.overflow,
+            item,
+            collectEquippedItemIds(save.roster),
+            getBackpackCapacity(save.abilities),
+          );
+          save.inventory = inserted.inventory;
+          save.overflow = inserted.overflow;
+          save.gold += inserted.goldGained;
+          if (inserted.rejected) {
+            events.push({ type: "toast", message: "溢出区已满，部分装备未能放入" });
+          }
+        }
         events.push({
-          type: "lootChest:leveled",
-          level: result.chest.level,
-          gold: result.goldGained,
-        });
-      } else if (result.rewarded) {
-        events.push({
-          type: "lootChest:rewarded",
-          level: result.chest.level,
-          gold: result.goldGained,
+          type: "lootChest:opened",
+          level: result.openedLevel,
+          gold: result.gold,
+          exp: result.exp,
+          items: result.items,
+          lucky: result.lucky,
         });
       }
     } else if (action.type === "offline:claim") {
       save.gold += action.gold;
+      save.exp += action.exp;
       for (const item of action.items) {
         const result = insertInventoryItem(
           save.inventory,
@@ -347,6 +550,94 @@ export class GameStore {
     save.gold += gold;
     events.push({ type: "item:salvagedMany", count, gold });
     this.state.ui.toast = `分解 ${count} 件 · ● ${gold}`;
+  }
+
+  private findCraftItem(itemId: string, events: AppEvent[]) {
+    const item = this.state.save.inventory.find(({ instanceId }) => instanceId === itemId);
+    if (!item) {
+      events.push({ type: "toast", message: "装备不在背包中" });
+      return null;
+    }
+    return item;
+  }
+
+  private craftSocket(itemId: string, events: AppEvent[]): void {
+    const item = this.findCraftItem(itemId, events);
+    if (!item) return;
+    const result = openEquipmentSocket(item, this.state.save.materials);
+    if (!result.ok) {
+      events.push({ type: "toast", message: result.reason });
+      return;
+    }
+    events.push({ type: "craft:socketed", itemId, sockets: item.sockets?.length ?? 0 });
+    this.state.ui.toast = `开孔成功 · ${item.sockets?.length ?? 0}/2`;
+  }
+
+  private craftReset(itemId: string, affixIndex: number, events: AppEvent[]): void {
+    const item = this.findCraftItem(itemId, events);
+    if (!item) return;
+    const result = resetEquipmentAffix(
+      item,
+      affixIndex,
+      this.state.save.materials,
+      new SeededRandom(Date.now() ^ this.state.save.updatedAt),
+    );
+    if (!result.ok) {
+      events.push({ type: "toast", message: result.reason });
+      return;
+    }
+    events.push({ type: "craft:reset", itemId });
+    this.state.ui.toast = `重置成功 · ${formatAffixValue(result.affix.affixId, result.affix.value)}`;
+  }
+
+  private craftSmelt(itemId: string, affixId: import("../content/affixes").AffixId, events: AppEvent[]): void {
+    const item = this.findCraftItem(itemId, events);
+    if (!item) return;
+    const result = smeltEquipmentAffix(
+      item,
+      affixId,
+      this.state.save.materials,
+      new SeededRandom(Date.now() ^ this.state.save.updatedAt ^ item.affixes.length),
+    );
+    if (!result.ok) {
+      events.push({ type: "toast", message: result.reason });
+      return;
+    }
+    events.push({
+      type: "craft:smelted",
+      itemId,
+      affixId,
+      value: result.roll.value,
+    });
+    this.state.ui.toast = `熔炼成功 · ${formatAffixValue(affixId, result.roll.value)}`;
+  }
+
+  private craftInlay(
+    itemId: string,
+    socketIndex: number,
+    gemId: import("../content/materials").MaterialId,
+    events: AppEvent[],
+  ): void {
+    const item = this.findCraftItem(itemId, events);
+    if (!item) return;
+    const result = inlayGem(item, socketIndex, gemId, this.state.save.materials);
+    if (!result.ok) {
+      events.push({ type: "toast", message: result.reason });
+      return;
+    }
+    events.push({ type: "craft:inlaid", itemId, gemId });
+    this.state.ui.toast = `镶嵌成功 · ${MATERIAL_BY_ID[gemId].name}`;
+  }
+
+  private craftRemoveGem(itemId: string, socketIndex: number, events: AppEvent[]): void {
+    const item = this.findCraftItem(itemId, events);
+    if (!item) return;
+    const result = removeGem(item, socketIndex, this.state.save.materials);
+    if (!result.ok) {
+      events.push({ type: "toast", message: result.reason });
+      return;
+    }
+    this.state.ui.toast = `已卸下 · ${MATERIAL_BY_ID[result.gemId].name}`;
   }
 
   private craftAlchemy(itemIds: readonly string[], events: AppEvent[]): void {

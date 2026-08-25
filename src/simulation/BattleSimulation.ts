@@ -2,9 +2,10 @@ import { ENEMY_BY_ID } from "../content/enemies";
 import { HERO_BY_ID } from "../content/heroes";
 import { STAGE_DEFINITIONS } from "../content/stages";
 import { ACTIVE_SKILL_BY_HERO } from "../content/skills";
-import { getHeroStats } from "../progression/HeroProgression";
+import { HERO_SKILL_BY_ID } from "../content/heroSkills";
+import { getHeroStats, type HeroStatGrowth } from "../progression/HeroProgression";
 import { SKILL_COOLDOWN_REDUCTION_CAP, DODGE_CHANCE_CAP, BLOCK_CHANCE_CAP } from "../content/affixes";
-import { calculateDamage, applyDamage, applyHealing, resolveHit, schoolDamageMultiplier } from "./CombatSystem";
+import { calculateDamage, applyHealing, resolveHit, schoolDamageMultiplier, elementDamageMultiplier, outgoingElementMultiplier } from "./CombatSystem";
 import {
   advanceMovement,
   engageRange,
@@ -17,7 +18,7 @@ import {
   heroFormationOffset,
 } from "./MovementSystem";
 import { SeededRandom } from "./RandomSource";
-import { tryCastSkill } from "./SkillSystem";
+import { tryCastReadySkill } from "./SkillSystem";
 import { advanceStatuses, applyStatus, getStatusMagnitude, isStunned } from "./StatusSystem";
 import { selectTarget } from "./TargetingSystem";
 import { createEnemyUnits, trashQuotaForStage } from "./WaveSystem";
@@ -27,6 +28,7 @@ export interface BattleSimulationOptions {
   stage: number;
   party: readonly (HeroId | null)[];
   heroLevels: Partial<Record<HeroId, number>>;
+  heroGrowth?: Partial<Record<HeroId, HeroStatGrowth>>;
   heroBonuses?: Partial<Record<HeroId, HeroBattleBonus>>;
   heroStartX?: Partial<Record<HeroId, number>>;
   startWithTravel?: boolean;
@@ -70,9 +72,40 @@ export interface HeroBattleBonus {
   physicalDamagePct?: number;
   /** Extra damage when hero damageSchool is magic (spell). */
   magicDamagePct?: number;
+  /** Extra outgoing fire-element damage (fraction). */
+  fireDamagePct?: number;
+  /** Extra outgoing frost-element damage (fraction). */
+  frostDamagePct?: number;
+  /** Extra outgoing lightning-element damage (fraction). */
+  lightningDamagePct?: number;
+  /** Extra outgoing dark-element damage (fraction). */
+  darkDamagePct?: number;
+  /** Incoming physical resist (fraction). */
+  physicalResistPct?: number;
+  /** Incoming fire resist (fraction). */
+  fireResistPct?: number;
+  /** Incoming frost resist (fraction). */
+  frostResistPct?: number;
+  /** Incoming lightning resist (fraction). */
+  lightningResistPct?: number;
+  /** Incoming dark resist (fraction). */
+  darkResistPct?: number;
+  /** Incoming holy resist (fraction). */
+  holyResistPct?: number;
+  /** Incoming resist added to every element (fraction). */
+  allResistPct?: number;
+  /** Multiplier on outgoing heal amounts (skills / potions). */
+  healPowerPct?: number;
   skillCooldownPct?: number;
   skillDamagePct?: number;
   executeDamagePct?: number;
+  attackPct?: number;
+  hpRegenMaxHpPct?: number;
+  waveStartShieldPct?: number;
+  waveStartSkillCdrPct?: number;
+  chosenSkillId?: string;
+  ultimateUnlocked?: boolean;
+  awakeningUnlocked?: boolean;
   guardianShieldPct?: number;
   thornsPct?: number;
   renewalPct?: number;
@@ -111,10 +144,12 @@ export class BattleSimulation {
   private events: BattleEvent[] = [];
   private readonly random: SeededRandom;
   private readonly seed: number;
+  private heroGrowth: Partial<Record<HeroId, HeroStatGrowth>>;
 
   constructor(options: BattleSimulationOptions) {
     this.stage = options.stage;
     this.seed = options.seed;
+    this.heroGrowth = options.heroGrowth ?? {};
     this.random = new SeededRandom(options.seed);
     this.baseTrashQuota = Math.max(1, trashQuotaForStage(options.stage, options.seed));
     const progressBonus = Math.max(0, options.bossProgressBonus ?? 0);
@@ -190,11 +225,13 @@ export class BattleSimulation {
   refreshHeroStats(
     levels: Partial<Record<HeroId, number>>,
     bonuses: Partial<Record<HeroId, HeroBattleBonus>>,
+    growth?: Partial<Record<HeroId, HeroStatGrowth>>,
   ): void {
+    if (growth) this.heroGrowth = growth;
     for (const unit of this.units.filter(({ team, alive }) => team === "heroes" && alive)) {
       const heroId = unit.sourceId as HeroId;
       const definition = HERO_BY_ID[heroId];
-      const levelStats = getHeroStats(heroId, levels[heroId] ?? 1);
+      const levelStats = getHeroStats(heroId, levels[heroId] ?? 1, this.heroGrowth[heroId]);
       const bonus = bonuses[heroId] ?? {};
       const hpRatio = unit.hp / unit.maxHp;
       const cooldownRatio = unit.attackCooldownMs / Math.max(1, unit.attackIntervalMs);
@@ -202,7 +239,7 @@ export class BattleSimulation {
       const interval = Math.round(definition.attackIntervalMs / (1 + (bonus.attackSpeedPct ?? 0) / 100));
       unit.maxHp = maxHp;
       unit.hp = Math.max(1, Math.round(maxHp * hpRatio));
-      unit.attack = levelStats.attack + (bonus.attack ?? 0);
+      unit.attack = Math.round((levelStats.attack + (bonus.attack ?? 0)) * (1 + (bonus.attackPct ?? 0)));
       unit.defense = Math.round(
         (levelStats.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0)),
       );
@@ -264,16 +301,22 @@ export class BattleSimulation {
       const cooldownRate = Math.max(0.2, 1 + haste - slow);
       unit.attackCooldownMs -= deltaMs * cooldownRate;
       unit.skillCooldownMs -= deltaMs;
-      const hpRegen = Number(unit.passiveFlags.gearHpRegenPerSec ?? 0);
+      unit.ultimateCooldownMs -= deltaMs;
+      const hpRegen =
+        Number(unit.passiveFlags.gearHpRegenPerSec ?? 0) +
+        unit.maxHp * Number(unit.passiveFlags.kitHpRegenMaxHpPct ?? 0);
       if (unit.team === "heroes" && hpRegen > 0 && unit.hp < unit.maxHp) {
         applyHealing(unit, (hpRegen * deltaMs) / 1000, false);
       }
-      if (unit.sourceId === "H01" && unit.hp / unit.maxHp < 0.4 && !unit.passiveFlags.hold) {
+      const holdLine = Number(unit.passiveFlags.kitHoldLine ?? 0.4);
+      if (unit.sourceId === "H01" && unit.hp / unit.maxHp < holdLine && !unit.passiveFlags.hold) {
         applyStatus(unit, { kind: "damageReduction", magnitude: 0.15, remainingMs: 999_999, sourceId: unit.id });
         unit.passiveFlags.hold = true;
       }
-      if (unit.sourceId === "H02" && unit.hp / unit.maxHp < 0.45 && !unit.passiveFlags.blood) {
-        applyStatus(unit, { kind: "haste", magnitude: 0.25, remainingMs: 999_999, sourceId: unit.id });
+      const bloodLine = Number(unit.passiveFlags.kitBloodLine ?? 0.45);
+      const bloodHaste = Number(unit.passiveFlags.kitBloodHaste ?? 0.25);
+      if (unit.sourceId === "H02" && unit.hp / unit.maxHp < bloodLine && !unit.passiveFlags.blood) {
+        applyStatus(unit, { kind: "haste", magnitude: bloodHaste, remainingMs: 999_999, sourceId: unit.id });
         unit.passiveFlags.blood = true;
       }
       const mirageGuard = Number(unit.passiveFlags.gearMirageGuard ?? 0);
@@ -298,8 +341,8 @@ export class BattleSimulation {
   private resolveActions(): void {
     for (const unit of this.units) {
       if (!unit.alive || isStunned(unit)) continue;
-      if (unit.team === "heroes" && unit.skillCooldownMs <= 0) {
-        const skillEvents = tryCastSkill(unit, this.units, this.random);
+      if (unit.team === "heroes") {
+        const skillEvents = tryCastReadySkill(unit, this.units, this.random);
         this.pushCombatEvents(skillEvents);
         // Only skip the auto-attack when a skill actually resolved this tick.
         if (skillEvents.some((event) => event.type === "skill:resolved")) continue;
@@ -338,9 +381,12 @@ export class BattleSimulation {
       source.sourceId === "H06" ? "lowestHpEnemy" : source.team === "enemies" ? "frontmostEnemy" : "nearestEnemy";
     const target = selectTarget(source, this.units, strategy);
     if (!target || Math.abs(target.x - source.x) > engageRange(source) + 4) return;
-    let multiplier = source.passiveFlags.ember ? 1.35 : 1;
+    let emberStacks = Number(source.passiveFlags.emberStacks ?? 0);
+    if (source.passiveFlags.ember) emberStacks = Math.max(emberStacks, 1);
+    let multiplier = emberStacks > 0 ? 1.35 : 1;
     multiplier *= 1 + Number(source.passiveFlags.gearDamagePct ?? 0);
     multiplier *= schoolDamageMultiplier(source);
+    multiplier *= elementDamageMultiplier(source);
     if (source.team === "heroes") {
       multiplier *= 1 + Number(source.passiveFlags.gearPrimaryAttackPct ?? 0);
     }
@@ -352,9 +398,10 @@ export class BattleSimulation {
       multiplier *= 1 + Number(source.passiveFlags.gearEliteDamage ?? 0);
     }
     source.passiveFlags.ember = false;
+    if (emberStacks > 0) source.passiveFlags.emberStacks = emberStacks - 1;
     const critMultiplier = 1.5 + Number(source.passiveFlags.gearCritDamagePct ?? 0) / 100;
     const roll = calculateDamage(
-      source.attack * multiplier,
+      source.attack * multiplier * outgoingElementMultiplier(source),
       target.defense,
       source.critChance,
       this.random,
@@ -370,7 +417,7 @@ export class BattleSimulation {
       targetId: target.id,
       ranged: source.attackRange > 100,
     });
-    const hit = resolveHit(target, roll.damage, this.random);
+    const hit = resolveHit(target, roll.damage, this.random, source.damageElement);
     if (hit.outcome === "hit") {
       this.events.push({
         type: "damage",
@@ -378,6 +425,7 @@ export class BattleSimulation {
         targetId: target.id,
         amount: hit.amount,
         critical: roll.critical && !hit.blocked,
+        element: source.damageElement,
       });
       const lifeOnHit = Number(source.passiveFlags.gearLifeOnHit ?? 0);
       if (source.team === "heroes" && lifeOnHit > 0 && source.alive) {
@@ -387,6 +435,16 @@ export class BattleSimulation {
       if (source.team === "heroes" && lifeSteal > 0 && source.alive) {
         applyHealing(source, hit.amount * lifeSteal, false);
       }
+      const bloodSteal = Number(source.passiveFlags.kitBloodStealPct ?? 0);
+      const bloodLine = Number(source.passiveFlags.kitBloodLine ?? 0.45);
+      if (
+        source.team === "heroes" &&
+        bloodSteal > 0 &&
+        source.alive &&
+        source.hp / source.maxHp < bloodLine
+      ) {
+        applyHealing(source, hit.amount * bloodSteal, false);
+      }
       const thunderbrand = Number(source.passiveFlags.gearThunderbrand ?? 0);
       if (
         source.team === "heroes" &&
@@ -394,7 +452,7 @@ export class BattleSimulation {
         source.basicAttackCount % 4 === 0
       ) {
         const bonusDamage = Math.round(source.attack * thunderbrand);
-        const bonusHit = resolveHit(target, bonusDamage, this.random);
+        const bonusHit = resolveHit(target, bonusDamage, this.random, source.damageElement);
         if (bonusHit.outcome === "hit") {
           this.events.push({
             type: "damage",
@@ -402,6 +460,7 @@ export class BattleSimulation {
             targetId: target.id,
             amount: bonusHit.amount,
             critical: false,
+            element: source.damageElement,
           });
         }
       }
@@ -432,7 +491,7 @@ export class BattleSimulation {
       const thorns = Number(target.passiveFlags.gearThorns ?? 0);
       if (thorns > 0 && source.attackRange <= 80 && source.alive) {
         const reflected = Math.max(1, Math.round(target.attack * thorns));
-        const thornsHit = resolveHit(source, reflected, this.random);
+        const thornsHit = resolveHit(source, reflected, this.random, "physical");
         if (thornsHit.outcome === "hit") {
           this.events.push({
             type: "damage",
@@ -440,11 +499,13 @@ export class BattleSimulation {
             targetId: source.id,
             amount: thornsHit.amount,
             critical: false,
+            element: "physical",
           });
         }
       }
     }
-    if (source.sourceId === "H05" && source.basicAttackCount % 4 === 0) {
+    const rapidEvery = Math.max(1, Number(source.passiveFlags.kitRapidEvery ?? 4));
+    if (source.sourceId === "H05" && source.basicAttackCount % rapidEvery === 0) {
       applyStatus(source, { kind: "haste", magnitude: 0.2, remainingMs: 2500, sourceId: source.id });
     }
     if (source.sourceId === "E04" && source.basicAttackCount % 4 === 0) {
@@ -460,14 +521,14 @@ export class BattleSimulation {
     this.events.push({ type: "skill:started", sourceId: boss.id, skillId: "root-smash" });
     for (const target of targets) {
       const roll = calculateDamage(
-        boss.attack * 1.3,
+        boss.attack * 1.3 * outgoingElementMultiplier(boss),
         target.defense,
         boss.critChance,
         this.random,
         getStatusMagnitude(target, "armorBreak"),
       );
       this.prepareGuardian(target);
-      const hit = resolveHit(target, roll.damage, this.random);
+      const hit = resolveHit(target, roll.damage, this.random, boss.damageElement);
       if (hit.outcome === "hit") {
         this.events.push({
           type: "damage",
@@ -475,6 +536,7 @@ export class BattleSimulation {
           targetId: target.id,
           amount: hit.amount,
           critical: roll.critical && !hit.blocked,
+          element: boss.damageElement,
         });
       }
       applyStatus(target, { kind: "stun", magnitude: 1, remainingMs: 800, sourceId: boss.id });
@@ -626,7 +688,7 @@ export class BattleSimulation {
     return party.flatMap((heroId, index) => {
       if (!heroId) return [];
       const definition = HERO_BY_ID[heroId];
-      const levelStats = getHeroStats(heroId, levels[heroId] ?? 1);
+      const levelStats = getHeroStats(heroId, levels[heroId] ?? 1, this.heroGrowth[heroId]);
       const bonus = bonuses[heroId] ?? {};
       const maxHp = Math.round((levelStats.maxHp + (bonus.maxHp ?? 0)) * (1 + (bonus.maxHpPct ?? 0)));
       const formation = heroFormationOffset(definition.attackRange, index, heroId);
@@ -639,10 +701,11 @@ export class BattleSimulation {
         y: formation.y,
         hp: maxHp,
         maxHp,
-        attack: levelStats.attack + (bonus.attack ?? 0),
+        attack: Math.round((levelStats.attack + (bonus.attack ?? 0)) * (1 + (bonus.attackPct ?? 0))),
         defense: Math.round(
           (levelStats.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0)),
         ),
+        damageElement: definition.damageElement,
         critChance: 0.05 + (bonus.critChance ?? 0),
         attackRange: definition.attackRange,
         moveSpeed: definition.moveSpeed * (1 + (bonus.moveSpeedPct ?? 0) / 100),
@@ -652,22 +715,53 @@ export class BattleSimulation {
           (ACTIVE_SKILL_BY_HERO[heroId].cooldownMs ?? 6000) *
             (1 - Math.min(SKILL_COOLDOWN_REDUCTION_CAP, bonus.skillCooldownPct ?? 0)),
         ),
+        ultimateCooldownMs: bonus.chosenSkillId
+          ? Math.round(
+              (HERO_SKILL_BY_ID[bonus.chosenSkillId as keyof typeof HERO_SKILL_BY_ID]?.cooldownMs ?? 12000) *
+                (1 - Math.min(SKILL_COOLDOWN_REDUCTION_CAP, bonus.skillCooldownPct ?? 0)),
+            )
+          : Number.POSITIVE_INFINITY,
         targetId: null,
         shield: 0,
         statuses: [],
         alive: true,
         basicAttackCount: 0,
         skillCastCount: 0,
-        passiveFlags: this.createGearFlags(bonus, definition.damageSchool),
+        chosenSkillId: bonus.chosenSkillId ?? null,
+        passiveFlags: this.createGearFlags(bonus, definition.damageSchool, heroId),
       }];
     });
+  }
+
+  private createKitFlags(heroId: HeroId, bonus: HeroBattleBonus): Record<string, boolean | number> {
+    return {
+      kitUltimate: bonus.chosenSkillId ? 1 : 0,
+      kitHoldLine: 0.4,
+      kitBloodLine: 0.45,
+      kitBloodHaste: 0.25,
+      kitBloodStealPct: 0,
+      kitEmberMax: 1,
+      kitSplashBonus: 0,
+      kitHealShieldCap: 0.1,
+      kitPierceExtra: 0,
+      kitHuntAmp: 0,
+      kitHuntKillHaste: 0,
+      kitSlowAmp: 0,
+      kitFrostStun: 0,
+      kitRapidEvery: 4,
+      kitHpRegenMaxHpPct: bonus.hpRegenMaxHpPct ?? 0,
+      kitWaveShieldPct: bonus.waveStartShieldPct ?? 0,
+      kitWaveSkillCdrPct: bonus.waveStartSkillCdrPct ?? 0,
+    };
   }
 
   private createGearFlags(
     bonus: HeroBattleBonus,
     damageSchool: "physical" | "magic" = "physical",
+    heroId?: HeroId,
   ): Record<string, boolean | number> {
     return {
+      ...(heroId ? this.createKitFlags(heroId, bonus) : {}),
       gearSkillDamage: bonus.skillDamagePct ?? 0,
       gearExecute: bonus.executeDamagePct ?? 0,
       gearDamagePct: bonus.damagePct ?? 0,
@@ -682,8 +776,20 @@ export class BattleSimulation {
       gearBlockChance: Math.min(BLOCK_CHANCE_CAP, bonus.blockChance ?? 0),
       gearPhysicalDamage: bonus.physicalDamagePct ?? 0,
       gearMagicDamage: bonus.magicDamagePct ?? 0,
+      gearFireDamage: bonus.fireDamagePct ?? 0,
+      gearFrostDamage: bonus.frostDamagePct ?? 0,
+      gearLightningDamage: bonus.lightningDamagePct ?? 0,
+      gearDarkDamage: bonus.darkDamagePct ?? 0,
+      gearPhysicalResist: bonus.physicalResistPct ?? 0,
+      gearFireResist: bonus.fireResistPct ?? 0,
+      gearFrostResist: bonus.frostResistPct ?? 0,
+      gearLightningResist: bonus.lightningResistPct ?? 0,
+      gearDarkResist: bonus.darkResistPct ?? 0,
+      gearHolyResist: bonus.holyResistPct ?? 0,
+      gearAllResist: bonus.allResistPct ?? 0,
       gearDamageSchoolMagic: damageSchool === "magic" ? 1 : 0,
       gearSkillCooldownPct: Math.min(SKILL_COOLDOWN_REDUCTION_CAP, bonus.skillCooldownPct ?? 0),
+      gearHealPowerPct: bonus.healPowerPct ?? 0,
       gearGuardian: bonus.guardianShieldPct ?? 0,
       gearThorns: bonus.thornsPct ?? 0,
       gearRenewal: bonus.renewalPct ?? 0,
@@ -712,15 +818,30 @@ export class BattleSimulation {
     const mirageGuardUsed = unit.passiveFlags.gearMirageGuardUsed ?? false;
     const cloudveilUsed = unit.passiveFlags.gearCloudveilUsed ?? false;
     const stormwardUsed = unit.passiveFlags.gearStormwardUsed ?? false;
-    const hero = HERO_BY_ID[unit.sourceId as HeroId];
+    const hold = unit.passiveFlags.hold ?? false;
+    const blood = unit.passiveFlags.blood ?? false;
+    const ember = unit.passiveFlags.ember ?? false;
+    const emberStacks = unit.passiveFlags.emberStacks ?? 0;
+    const heroId = unit.sourceId as HeroId;
+    const hero = HERO_BY_ID[heroId];
     const school = hero?.damageSchool ?? "physical";
-    Object.assign(unit.passiveFlags, this.createGearFlags(bonus, school));
+    Object.assign(unit.passiveFlags, this.createGearFlags(bonus, school, heroId));
     unit.passiveFlags.gearGuardianUsed = guardianUsed;
     unit.passiveFlags.gearSnowguardShield = snowguardShield;
     unit.passiveFlags.gearFrostfocusTriggered = frostfocusTriggered;
     unit.passiveFlags.gearMirageGuardUsed = mirageGuardUsed;
     unit.passiveFlags.gearCloudveilUsed = cloudveilUsed;
     unit.passiveFlags.gearStormwardUsed = stormwardUsed;
+    unit.passiveFlags.hold = hold;
+    unit.passiveFlags.blood = blood;
+    unit.passiveFlags.ember = ember;
+    unit.passiveFlags.emberStacks = emberStacks;
+    unit.chosenSkillId = bonus.chosenSkillId ?? null;
+    if (bonus.chosenSkillId) {
+      if (!Number.isFinite(unit.ultimateCooldownMs)) unit.ultimateCooldownMs = 0;
+    } else {
+      unit.ultimateCooldownMs = Number.POSITIVE_INFINITY;
+    }
   }
 
   private applyWaveEquipmentEffects(hero: UnitState): void {
@@ -745,6 +866,17 @@ export class BattleSimulation {
         sourceId: `${hero.id}:tailwind`,
       });
       this.events.push({ type: "status:applied", targetId: hero.id, kind: "haste" });
+    }
+    const waveShield = Number(hero.passiveFlags.kitWaveShieldPct ?? 0);
+    if (waveShield > 0) {
+      hero.shield += Math.round(hero.maxHp * waveShield);
+    }
+    const waveCdr = Number(hero.passiveFlags.kitWaveSkillCdrPct ?? 0);
+    if (waveCdr > 0) {
+      hero.skillCooldownMs = Math.round(hero.skillCooldownMs * (1 - waveCdr));
+      if (Number.isFinite(hero.ultimateCooldownMs)) {
+        hero.ultimateCooldownMs = Math.round(hero.ultimateCooldownMs * (1 - waveCdr));
+      }
     }
   }
 

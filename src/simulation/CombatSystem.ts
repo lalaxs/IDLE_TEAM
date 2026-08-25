@@ -9,6 +9,12 @@ import {
   BLOCK_DAMAGE_FACTOR,
   DODGE_CHANCE_CAP,
 } from "../content/affixes";
+import {
+  ELEMENTAL_ATTACK_AMP,
+  allResistFromDefense,
+  clampElementResist,
+  type DamageElement,
+} from "../content/damageElements";
 import type { RandomSource } from "./RandomSource";
 import { getStatusMagnitude } from "./StatusSystem";
 import type { UnitState } from "./types";
@@ -61,6 +67,47 @@ export function schoolDamageMultiplier(source: UnitState): number {
   return 1 + Number(source.passiveFlags.gearPhysicalDamage ?? 0);
 }
 
+const ELEMENT_DAMAGE_FLAG: Record<DamageElement, string> = {
+  physical: "",
+  fire: "gearFireDamage",
+  frost: "gearFrostDamage",
+  lightning: "gearLightningDamage",
+  dark: "gearDarkDamage",
+  holy: "",
+};
+
+/** Precise elemental damage (Fire/Frost/Lightning/Dark %). Physical and holy use school / heal affixes instead. */
+export function elementDamageMultiplier(source: UnitState): number {
+  const flag = ELEMENT_DAMAGE_FLAG[source.damageElement];
+  if (!flag) return 1;
+  return 1 + Number(source.passiveFlags[flag] ?? 0);
+}
+
+const RESIST_FLAG: Record<DamageElement, string> = {
+  physical: "gearPhysicalResist",
+  fire: "gearFireResist",
+  frost: "gearFrostResist",
+  lightning: "gearLightningResist",
+  dark: "gearDarkResist",
+  holy: "gearHolyResist",
+};
+
+/** Heroes only: defense all-resist + gear all-resist + matching elemental resist, capped. */
+export function incomingElementResist(target: UnitState, element: DamageElement): number {
+  if (target.team !== "heroes") return 0;
+  const fromDefense = allResistFromDefense(target.defense);
+  const all = Number(target.passiveFlags.gearAllResist ?? 0);
+  const specific = Number(target.passiveFlags[RESIST_FLAG[element]] ?? 0);
+  return clampElementResist(fromDefense + all + specific);
+}
+
+/** Non-physical monster hits hit much harder unless the hero stacked matching resist. */
+export function outgoingElementMultiplier(source: UnitState): number {
+  if (source.team !== "enemies") return 1;
+  if (source.damageElement === "physical") return 1;
+  return 1 + ELEMENTAL_ATTACK_AMP;
+}
+
 export function applyDamage(
   target: UnitState,
   amount: number,
@@ -95,11 +142,12 @@ export function applyDamage(
   return { hpDamage, absorbed, died: !target.alive };
 }
 
-/** Apply dodge → block → damage for an already-rolled hit amount. */
+/** Apply dodge → block → elemental resist → damage for an already-rolled hit amount. */
 export function resolveHit(
   target: UnitState,
   amount: number,
   random: RandomSource,
+  element: DamageElement = "physical",
 ): HitResolution {
   const dodge = Math.min(DODGE_CHANCE_CAP, Number(target.passiveFlags.gearDodgeChance ?? 0));
   if (dodge > 0 && random.next() < dodge) {
@@ -112,6 +160,10 @@ export function resolveHit(
     dealt = Math.max(1, Math.round(amount * BLOCK_DAMAGE_FACTOR));
     blocked = true;
   }
+  const resist = incomingElementResist(target, element);
+  if (resist > 0) {
+    dealt = Math.max(0, Math.round(dealt * (1 - resist)));
+  }
   const result = applyDamage(target, dealt);
   return { outcome: "hit", ...result, blocked, amount: dealt };
 }
@@ -120,13 +172,14 @@ export function applyHealing(
   target: UnitState,
   amount: number,
   overflowToShield: boolean,
+  shieldCapRatio = 0.1,
 ): { healed: number; shielded: number } {
   const missing = target.maxHp - target.hp;
   const healed = Math.max(0, Math.min(missing, Math.round(amount)));
   target.hp += healed;
   let shielded = 0;
   if (overflowToShield) {
-    const cap = Math.round(target.maxHp * 0.1);
+    const cap = Math.round(target.maxHp * Math.max(0.1, shieldCapRatio));
     shielded = Math.min(Math.max(0, Math.round(amount) - healed), cap - target.shield);
     target.shield += Math.max(0, shielded);
   }

@@ -1,10 +1,11 @@
 import { GameStore } from "./GameStore";
 import { getEquipmentBonuses } from "../progression/EquipmentBonuses";
+import { heroGrowthFromProgress, type HeroStatGrowth } from "../progression/HeroProgression";
 import { getChestProgressBonus } from "../progression/AbilitySystem";
 import { getLootChestKillCharge } from "../progression/LootChestSystem";
 import { generateStageRewards } from "../progression/RewardSystem";
 import type { SaveDataV1 } from "../persistence/schema";
-import { BattleSimulation } from "../simulation/BattleSimulation";
+import { BattleSimulation, type HeroBattleBonus } from "../simulation/BattleSimulation";
 import type { BattleEvent, HeroId } from "../simulation/types";
 
 export class GameSession {
@@ -19,7 +20,16 @@ export class GameSession {
     this.seed = seed;
     this.battle = this.createBattle();
     this.store.subscribe((_state, events) => {
-      if (events.some(({ type }) => type === "hero:leveled" || type === "item:equipped" || type === "item:unequipped" || type === "ability:upgraded")) {
+      if (events.some(({ type }) =>
+        type === "hero:leveled" ||
+        type === "hero:starred" ||
+        type === "hero:ascended" ||
+        type === "hero:talentUpgraded" ||
+        type === "hero:skillChosen" ||
+        type === "item:equipped" ||
+        type === "item:unequipped" ||
+        type === "ability:upgraded"
+      )) {
         this.refreshBattleHeroes();
       }
     });
@@ -44,7 +54,13 @@ export class GameSession {
       this.resolved = true;
       const stage = this.snapshot.stage;
       const rewards = generateStageRewards(stage, this.seed, this.store.getState().save.abilities);
-      this.store.dispatch({ type: "stage:victory", stage, gold: rewards.gold, items: rewards.items });
+      this.store.dispatch({
+        type: "stage:victory",
+        stage,
+        gold: rewards.gold,
+        exp: rewards.exp,
+        items: rewards.items,
+      });
       this.events.push(...rewards.items.map((item) => ({ type: "loot:revealed" as const, itemId: item.instanceId })));
     }
   }
@@ -85,11 +101,15 @@ export class GameSession {
     const heroLevels = Object.fromEntries(
       Object.entries(save.roster).map(([id, progress]) => [id, progress.level]),
     ) as Partial<Record<HeroId, number>>;
+    const heroGrowth = Object.fromEntries(
+      Object.entries(save.roster).map(([id, progress]) => [id, heroGrowthFromProgress(progress)]),
+    ) as Partial<Record<HeroId, HeroStatGrowth>>;
     return new BattleSimulation({
       stage: save.currentStage,
       party: save.party,
       heroLevels,
-      heroBonuses: getEquipmentBonuses(save),
+      heroGrowth,
+      heroBonuses: this.buildHeroBonuses(save),
       heroStartX,
       startWithTravel,
       seed: this.seed,
@@ -97,12 +117,19 @@ export class GameSession {
     });
   }
 
+  private buildHeroBonuses(save: SaveDataV1): Partial<Record<HeroId, HeroBattleBonus>> {
+    return getEquipmentBonuses(save);
+  }
+
   private refreshBattleHeroes(): void {
     const save = this.store.getState().save;
     const levels = Object.fromEntries(
       Object.entries(save.roster).map(([id, progress]) => [id, progress.level]),
     ) as Partial<Record<HeroId, number>>;
-    this.battle.refreshHeroStats(levels, getEquipmentBonuses(save));
+    const growth = Object.fromEntries(
+      Object.entries(save.roster).map(([id, progress]) => [id, heroGrowthFromProgress(progress)]),
+    ) as Partial<Record<HeroId, HeroStatGrowth>>;
+    this.battle.refreshHeroStats(levels, this.buildHeroBonuses(save), growth);
     this.battle.setBossProgressBonus(getChestProgressBonus(save.abilities));
   }
 }

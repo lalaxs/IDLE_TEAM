@@ -3,9 +3,13 @@ import {
   applyDamage,
   applyHealing,
   calculateDamage,
+  incomingElementResist,
+  outgoingElementMultiplier,
   resolveHit,
   schoolDamageMultiplier,
+  elementDamageMultiplier,
 } from "../../src/simulation/CombatSystem";
+import { ELEMENTAL_ATTACK_AMP, ELEMENT_RESIST_CAP } from "../../src/content/damageElements";
 import type { RandomSource } from "../../src/simulation/RandomSource";
 import { makeUnit } from "../support/makeUnit";
 
@@ -119,5 +123,90 @@ describe("combat formulas", () => {
     });
     expect(schoolDamageMultiplier(physical)).toBeCloseTo(1.2);
     expect(schoolDamageMultiplier(magic)).toBeCloseTo(1.5);
+  });
+
+  it("applies elemental damage only for the matching hit element", () => {
+    const flags = {
+      gearFireDamage: 0.18,
+      gearFrostDamage: 0.12,
+      gearLightningDamage: 0.1,
+      gearDarkDamage: 0.15,
+    };
+    expect(elementDamageMultiplier(makeUnit({ damageElement: "fire", passiveFlags: flags }))).toBeCloseTo(1.18);
+    expect(elementDamageMultiplier(makeUnit({ damageElement: "frost", passiveFlags: flags }))).toBeCloseTo(1.12);
+    expect(elementDamageMultiplier(makeUnit({ damageElement: "lightning", passiveFlags: flags }))).toBeCloseTo(1.1);
+    expect(elementDamageMultiplier(makeUnit({ damageElement: "dark", passiveFlags: flags }))).toBeCloseTo(1.15);
+    expect(elementDamageMultiplier(makeUnit({ damageElement: "physical", passiveFlags: flags }))).toBe(1);
+    expect(elementDamageMultiplier(makeUnit({ damageElement: "holy", passiveFlags: flags }))).toBe(1);
+  });
+
+  it("converts hero defense into a small all-element resist", () => {
+    const hero = makeUnit({ team: "heroes", defense: 400 });
+    const monster = makeUnit({ team: "enemies", defense: 400 });
+    expect(incomingElementResist(hero, "fire")).toBeCloseTo(400 / 4400);
+    expect(incomingElementResist(hero, "physical")).toBeCloseTo(400 / 4400);
+    expect(incomingElementResist(monster, "fire")).toBe(0);
+  });
+
+  it("reduces matching elemental hits and caps combined resist", () => {
+    const target = makeUnit({
+      team: "heroes",
+      hp: 200,
+      maxHp: 200,
+      defense: 0,
+      passiveFlags: { gearFireResist: 0.2, gearAllResist: 0.1 },
+    });
+    const neverAvoid: RandomSource = { ...fixedRandom, next: () => 0.99 };
+    const fireHit = resolveHit(target, 100, neverAvoid, "fire");
+    expect(fireHit.outcome).toBe("hit");
+    if (fireHit.outcome === "hit") {
+      expect(fireHit.amount).toBe(70);
+      expect(target.hp).toBe(130);
+    }
+
+    const stacked = makeUnit({
+      team: "heroes",
+      hp: 200,
+      maxHp: 200,
+      defense: 0,
+      passiveFlags: { gearFireResist: 0.5, gearAllResist: 0.4 },
+    });
+    expect(incomingElementResist(stacked, "fire")).toBe(ELEMENT_RESIST_CAP);
+    const capped = resolveHit(stacked, 100, neverAvoid, "fire");
+    if (capped.outcome === "hit") {
+      expect(capped.amount).toBe(25);
+    }
+
+    const physical = makeUnit({
+      team: "heroes",
+      hp: 100,
+      maxHp: 100,
+      defense: 0,
+      passiveFlags: { gearFireResist: 0.5 },
+    });
+    const physHit = resolveHit(physical, 40, neverAvoid, "physical");
+    if (physHit.outcome === "hit") {
+      expect(physHit.amount).toBe(40);
+    }
+
+    const holyTarget = makeUnit({
+      team: "heroes",
+      hp: 100,
+      maxHp: 100,
+      defense: 0,
+      passiveFlags: { gearHolyResist: 0.25 },
+    });
+    const holyHit = resolveHit(holyTarget, 80, neverAvoid, "holy");
+    if (holyHit.outcome === "hit") {
+      expect(holyHit.amount).toBe(60);
+    }
+  });
+
+  it("amps non-physical monster attacks", () => {
+    expect(outgoingElementMultiplier(makeUnit({ team: "enemies", damageElement: "fire" }))).toBe(
+      1 + ELEMENTAL_ATTACK_AMP,
+    );
+    expect(outgoingElementMultiplier(makeUnit({ team: "enemies", damageElement: "physical" }))).toBe(1);
+    expect(outgoingElementMultiplier(makeUnit({ team: "heroes", damageElement: "fire" }))).toBe(1);
   });
 });

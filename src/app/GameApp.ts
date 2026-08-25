@@ -29,6 +29,7 @@ export class GameApp {
     this.session = new GameSession(save);
     this.shell = new AppShell(root, this.session.store, {
       onStageSelected: (stage) => this.restart(stage),
+      onDungeonDispatched: () => this.restart(),
       onPartySaved: () => this.restart(),
       onClearSave: () => {
         this.repository.clear();
@@ -150,8 +151,13 @@ export class GameApp {
       save.highestUnlockedStage,
       save.lastActiveAt,
     );
-    this.shell.showOfflineReward(reward.minutes, reward.gold, reward.gearCount, () => {
-      this.session.store.dispatch({ type: "offline:claim", gold: reward.gold, items });
+    this.shell.showOfflineReward(reward.minutes, reward.gold, reward.exp, reward.gearCount, () => {
+      this.session.store.dispatch({
+        type: "offline:claim",
+        gold: reward.gold,
+        exp: reward.exp,
+        items,
+      });
       this.repository.flush();
     });
   }

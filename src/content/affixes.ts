@@ -18,9 +18,7 @@ export type AffixId =
   | "crit_damage"
   | "skill_damage"
   | "cooldown_reduction"
-  | "life_pct"
   | "damage_reduction"
-  | "defense_pct"
   | "flat_attack"
   | "flat_life"
   | "flat_defense"
@@ -31,7 +29,19 @@ export type AffixId =
   | "block_chance"
   | "move_speed"
   | "physical_damage_pct"
-  | "magic_damage_pct";
+  | "magic_damage_pct"
+  | "fire_damage_pct"
+  | "frost_damage_pct"
+  | "lightning_damage_pct"
+  | "dark_damage_pct"
+  | "holy_heal_pct"
+  | "physical_resist"
+  | "fire_resist"
+  | "frost_resist"
+  | "lightning_resist"
+  | "dark_resist"
+  | "holy_resist"
+  | "all_resist";
 
 /** Soft caps for avoidance affixes (fraction 0–1). */
 export const DODGE_CHANCE_CAP = 0.35;
@@ -39,7 +49,12 @@ export const BLOCK_CHANCE_CAP = 0.35;
 /** Blocked hits deal this fraction of rolled damage. */
 export const BLOCK_DAMAGE_FACTOR = 0.5;
 
-export type AffixValueKind = "percent" | "flat_budget";
+export type AffixValueKind = "percent" | "percent_budget" | "flat_budget";
+
+/** Display as +N% (fixed percent or budget-scaled percent). */
+export function affixDisplaysPercent(kind: AffixValueKind): boolean {
+  return kind === "percent" || kind === "percent_budget";
+}
 
 type AffixBand = "uncommon" | "rare" | "epic";
 
@@ -73,6 +88,18 @@ export function getAffixRange(
 const WEAPON: readonly EquipmentSlot[] = ["main_weapon", "off_hand"];
 const ARMOR: readonly EquipmentSlot[] = ["helmet", "armor", "gloves", "boots", "bracer"];
 const ACCESSORY: readonly EquipmentSlot[] = ["ring", "amulet", "earring"];
+
+/** Budget fraction for all-resist; specific element resist is ~1.7–1.8× this. */
+const ALL_RESIST_BUDGET = {
+  uncommon: { min: 0.04, max: 0.06 },
+  rare: { min: 0.05, max: 0.08 },
+  epic: { min: 0.06, max: 0.1 },
+};
+const ELEMENT_RESIST_BUDGET = {
+  uncommon: { min: 0.07, max: 0.11 },
+  rare: { min: 0.09, max: 0.14 },
+  epic: { min: 0.11, max: 0.18 },
+};
 
 /**
  * Affix pool aligned to TBH decoration / engraving / inscription material stats.
@@ -184,19 +211,6 @@ export const AFFIX_DEFINITIONS: readonly AffixDefinition[] = [
     },
   },
   {
-    id: "life_pct",
-    sourceLabel: "Max HP %",
-    name: "生命百分比",
-    kind: "percent",
-    scoreWeight: 10,
-    slots: [...ARMOR, ...ACCESSORY],
-    ranges: {
-      uncommon: { min: 3, max: 5 },
-      rare: { min: 4, max: 7 },
-      epic: { min: 5, max: 8 },
-    },
-  },
-  {
     id: "flat_defense",
     sourceLabel: "Armor",
     name: "防御",
@@ -207,19 +221,6 @@ export const AFFIX_DEFINITIONS: readonly AffixDefinition[] = [
       uncommon: { min: 0.12, max: 0.2 },
       rare: { min: 0.15, max: 0.25 },
       epic: { min: 0.18, max: 0.3 },
-    },
-  },
-  {
-    id: "defense_pct",
-    sourceLabel: "Armor %",
-    name: "防御百分比",
-    kind: "percent",
-    scoreWeight: 11,
-    slots: [...ARMOR],
-    ranges: {
-      uncommon: { min: 3, max: 5 },
-      rare: { min: 4, max: 7 },
-      epic: { min: 5, max: 8 },
     },
   },
   {
@@ -295,9 +296,9 @@ export const AFFIX_DEFINITIONS: readonly AffixDefinition[] = [
     scoreWeight: 9,
     slots: [...WEAPON, "gloves", "ring", "amulet"],
     ranges: {
-      uncommon: { min: 4, max: 6 },
-      rare: { min: 5, max: 8 },
-      epic: { min: 6, max: 10 },
+      uncommon: { min: 6, max: 8 },
+      rare: { min: 8, max: 12 },
+      epic: { min: 11, max: 15 },
     },
   },
   {
@@ -308,10 +309,138 @@ export const AFFIX_DEFINITIONS: readonly AffixDefinition[] = [
     scoreWeight: 9,
     slots: [...WEAPON, "helmet", "ring", "amulet", "earring"],
     ranges: {
-      uncommon: { min: 4, max: 6 },
-      rare: { min: 5, max: 8 },
-      epic: { min: 6, max: 10 },
+      uncommon: { min: 6, max: 8 },
+      rare: { min: 8, max: 12 },
+      epic: { min: 11, max: 15 },
     },
+  },
+  {
+    id: "fire_damage_pct",
+    sourceLabel: "Fire Damage %",
+    name: "火焰伤害",
+    kind: "percent",
+    scoreWeight: 8,
+    slots: [...WEAPON, "helmet", "gloves", "ring", "amulet", "earring"],
+    ranges: {
+      uncommon: { min: 9, max: 13 },
+      rare: { min: 13, max: 18 },
+      epic: { min: 16, max: 24 },
+    },
+  },
+  {
+    id: "frost_damage_pct",
+    sourceLabel: "Frost Damage %",
+    name: "冰霜伤害",
+    kind: "percent",
+    scoreWeight: 8,
+    slots: [...WEAPON, "helmet", "gloves", "ring", "amulet", "earring"],
+    ranges: {
+      uncommon: { min: 9, max: 13 },
+      rare: { min: 13, max: 18 },
+      epic: { min: 16, max: 24 },
+    },
+  },
+  {
+    id: "lightning_damage_pct",
+    sourceLabel: "Lightning Damage %",
+    name: "雷电伤害",
+    kind: "percent",
+    scoreWeight: 8,
+    slots: [...WEAPON, "helmet", "gloves", "ring", "amulet", "earring"],
+    ranges: {
+      uncommon: { min: 9, max: 13 },
+      rare: { min: 13, max: 18 },
+      epic: { min: 16, max: 24 },
+    },
+  },
+  {
+    id: "dark_damage_pct",
+    sourceLabel: "Dark Damage %",
+    name: "暗黑伤害",
+    kind: "percent",
+    scoreWeight: 8,
+    slots: [...WEAPON, "helmet", "gloves", "ring", "amulet", "earring"],
+    ranges: {
+      uncommon: { min: 9, max: 13 },
+      rare: { min: 13, max: 18 },
+      epic: { min: 16, max: 24 },
+    },
+  },
+  {
+    id: "holy_heal_pct",
+    sourceLabel: "Holy Heal Power %",
+    name: "治疗效果",
+    kind: "percent",
+    scoreWeight: 8,
+    slots: [...WEAPON, "helmet", "ring", "amulet", "earring"],
+    ranges: {
+      uncommon: { min: 9, max: 13 },
+      rare: { min: 13, max: 18 },
+      epic: { min: 16, max: 24 },
+    },
+  },
+  {
+    id: "physical_resist",
+    sourceLabel: "Physical Resistance",
+    name: "物理抗性",
+    kind: "percent_budget",
+    scoreWeight: 4,
+    slots: [...ARMOR, ...ACCESSORY],
+    ranges: ELEMENT_RESIST_BUDGET,
+  },
+  {
+    id: "fire_resist",
+    sourceLabel: "Fire Resistance",
+    name: "火焰抗性",
+    kind: "percent_budget",
+    scoreWeight: 4,
+    slots: [...ARMOR, ...ACCESSORY],
+    ranges: ELEMENT_RESIST_BUDGET,
+  },
+  {
+    id: "frost_resist",
+    sourceLabel: "Frost Resistance",
+    name: "冰霜抗性",
+    kind: "percent_budget",
+    scoreWeight: 4,
+    slots: [...ARMOR, ...ACCESSORY],
+    ranges: ELEMENT_RESIST_BUDGET,
+  },
+  {
+    id: "lightning_resist",
+    sourceLabel: "Lightning Resistance",
+    name: "雷电抗性",
+    kind: "percent_budget",
+    scoreWeight: 4,
+    slots: [...ARMOR, ...ACCESSORY],
+    ranges: ELEMENT_RESIST_BUDGET,
+  },
+  {
+    id: "dark_resist",
+    sourceLabel: "Dark Resistance",
+    name: "暗黑抗性",
+    kind: "percent_budget",
+    scoreWeight: 4,
+    slots: [...ARMOR, ...ACCESSORY],
+    ranges: ELEMENT_RESIST_BUDGET,
+  },
+  {
+    id: "holy_resist",
+    sourceLabel: "Holy Resistance",
+    name: "圣光抗性",
+    kind: "percent_budget",
+    scoreWeight: 4,
+    slots: [...ARMOR, ...ACCESSORY],
+    ranges: ELEMENT_RESIST_BUDGET,
+  },
+  {
+    id: "all_resist",
+    sourceLabel: "All Elemental Resistance",
+    name: "全元素抗性",
+    kind: "percent_budget",
+    scoreWeight: 6,
+    slots: ["helmet", "armor", "amulet"],
+    ranges: ALL_RESIST_BUDGET,
   },
   {
     id: "dodge_chance",
@@ -364,8 +493,38 @@ export const SKILL_COOLDOWN_REDUCTION_CAP = 0.4;
 export function formatAffixValue(affixId: AffixId, value: number): string {
   const definition = AFFIX_BY_ID[affixId];
   if (!definition) return `+${value}`;
-  if (definition.kind === "percent") return `${definition.name} +${value}%`;
+  if (affixDisplaysPercent(definition.kind)) return `${definition.name} +${value}%`;
   return `${definition.name} +${value}`;
+}
+
+/** Possible rolled value bounds for craft preview (percent or flat-from-budget). */
+export function getAffixValueBounds(
+  affixId: AffixId,
+  rarity: Exclude<Rarity, "common">,
+  budget: number,
+): { min: number; max: number } {
+  const definition = AFFIX_BY_ID[affixId];
+  const range = getAffixRange(definition, rarity);
+  if (definition.kind === "percent") {
+    return { min: Math.round(range.min), max: Math.round(range.max) };
+  }
+  return {
+    min: Math.max(1, Math.round(budget * range.min)),
+    max: Math.max(1, Math.round(budget * range.max)),
+  };
+}
+
+export function formatAffixRangeLabel(
+  affixId: AffixId,
+  rarity: Exclude<Rarity, "common">,
+  budget: number,
+): string {
+  const definition = AFFIX_BY_ID[affixId];
+  const bounds = getAffixValueBounds(affixId, rarity, budget);
+  if (affixDisplaysPercent(definition.kind)) {
+    return `区间 ${bounds.min}% ~ ${bounds.max}%`;
+  }
+  return `区间 ${bounds.min} ~ ${bounds.max}`;
 }
 
 export function getAffixesForSlot(slot: EquipmentSlot): AffixDefinition[] {

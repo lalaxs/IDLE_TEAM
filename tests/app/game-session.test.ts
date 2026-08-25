@@ -22,7 +22,7 @@ describe("GameSession", () => {
     const goldAfterVictory = session.store.getState().save.gold;
     expect(session.store.getState().save.highestClearedStage).toBe(1);
     expect(session.store.getState().save.currentStage).toBe(2);
-    expect(goldAfterVictory).toBeGreaterThan(0);
+    expect(session.store.getState().save.exp).toBeGreaterThan(120);
     session.step(1000);
     expect(session.store.getState().save.gold).toBe(goldAfterVictory);
   });
@@ -83,7 +83,17 @@ describe("GameSession", () => {
     save.gold = 80;
     const session = new GameSession(save, 42);
     session.store.dispatch({ type: "hero:levelUp", heroId: "H01" });
-    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.maxHp).toBe(1643);
+    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.maxHp).toBe(1539);
+    expect(session.snapshot.wave).toBe(1);
+  });
+
+  it("keeps star flats after refresh and does not reset the wave", () => {
+    const save = createDefaultSave();
+    save.roster.H01.marks = 100;
+    const session = new GameSession(save, 42);
+    const before = session.snapshot.units.find(({ sourceId }) => sourceId === "H01")!.maxHp;
+    session.store.dispatch({ type: "hero:starUp", heroId: "H01" });
+    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.maxHp).toBeGreaterThan(before);
     expect(session.snapshot.wave).toBe(1);
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HERO_BY_ID } from "../../src/content/heroes";
-import { tryCastSkill } from "../../src/simulation/SkillSystem";
+import { tryCastReadySkill, tryCastSkill, tryCastUltimate } from "../../src/simulation/SkillSystem";
 import type { RandomSource } from "../../src/simulation/RandomSource";
 import type { HeroId, UnitState } from "../../src/simulation/types";
 import { makeUnit } from "../support/makeUnit";
@@ -86,5 +86,59 @@ describe("hero skills", () => {
     hero.skillCooldownMs = 0;
     tryCastSkill(hero, [hero, enemy], fixedRandom);
     expect(hero.shield).toBe(20);
+  });
+
+  it("scales Nora heals with holy heal power", () => {
+    const nora = makeUnit({
+      id: "nora",
+      sourceId: "H04",
+      attack: 100,
+      skillCooldownMs: 0,
+      damageElement: "holy",
+      passiveFlags: { gearHealPowerPct: 0.18 },
+    });
+    const ally = makeUnit({ id: "ally", hp: 10, maxHp: 10_000, x: 120 });
+    const events = tryCastSkill(nora, [nora, ally], fixedRandom);
+    const heal = events.find((event) => event.type === "heal");
+    expect(heal).toMatchObject({ type: "heal", amount: 1652 });
+    expect(ally.hp).toBe(1662);
+  });
+
+  it("casts the chosen shared hero skill before the primary skill", () => {
+    const hero = makeUnit({
+      id: "lorne",
+      sourceId: "H01",
+      attack: 100,
+      maxHp: 1000,
+      hp: 1000,
+      skillCooldownMs: 0,
+      ultimateCooldownMs: 0,
+      chosenSkillId: "iron-wall",
+      passiveFlags: { kitUltimate: 1 },
+    });
+    const enemy = makeUnit({
+      id: "enemy",
+      sourceId: "E01",
+      team: "enemies",
+      hp: 10_000,
+      maxHp: 10_000,
+      x: 170,
+    });
+    const events = tryCastReadySkill(hero, [hero, enemy], fixedRandom);
+    expect(events.some((event) => event.type === "skill:resolved" && event.skillId === "iron-wall")).toBe(true);
+    expect(hero.ultimateCooldownMs).toBeGreaterThan(0);
+    expect(hero.skillCooldownMs).toBe(0);
+    expect(hero.shield).toBeGreaterThan(0);
+  });
+
+  it("does not cast an ultimate without the kit flag", () => {
+    const hero = makeUnit({
+      id: "lorne",
+      sourceId: "H01",
+      skillCooldownMs: 1000,
+      ultimateCooldownMs: 0,
+    });
+    const enemy = makeUnit({ id: "enemy", sourceId: "E01", team: "enemies", hp: 100, maxHp: 100, x: 170 });
+    expect(tryCastUltimate(hero, [hero, enemy], fixedRandom)).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 import type { HeroId } from "../simulation/types";
-import { HERO_SKILL_COMBAT } from "./balance";
+import { HERO_SKILL_COMBAT, HERO_ULTIMATE_COMBAT } from "./balance";
 
 export interface SkillDefinition {
   id: string;
@@ -79,10 +79,88 @@ export const PASSIVE_SKILLS: readonly SkillDefinition[] = [
   { id: "war-drum", heroId: "H08", name: "战鼓图腾", description: "施放技能后全队获得攻速" },
 ] as const;
 
+export const ULTIMATE_SKILLS: readonly SkillDefinition[] = [
+  {
+    id: "bulwark-shout",
+    heroId: "H01",
+    name: "壁垒怒吼",
+    cooldownMs: HERO_ULTIMATE_COMBAT.H01.cooldownMs,
+    description: "自身获得18%最大生命护盾，全队减伤12%持续4秒，并对最近敌人造成220%伤害",
+  },
+  {
+    id: "blood-cyclone",
+    heroId: "H02",
+    name: "血战旋风",
+    cooldownMs: HERO_ULTIMATE_COMBAT.H02.cooldownMs,
+    description: "自身周围连续造成3次110%伤害",
+  },
+  {
+    id: "meteor",
+    heroId: "H03",
+    name: "陨星",
+    cooldownMs: HERO_ULTIMATE_COMBAT.H03.cooldownMs,
+    description: "对大范围敌人造成300%伤害",
+  },
+  {
+    id: "sanctuary",
+    heroId: "H04",
+    name: "圣域",
+    cooldownMs: HERO_ULTIMATE_COMBAT.H04.cooldownMs,
+    description: "治疗全队（220%攻击或10%最大生命，取高）",
+  },
+  {
+    id: "arrow-rain",
+    heroId: "H05",
+    name: "箭雨",
+    cooldownMs: HERO_ULTIMATE_COMBAT.H05.cooldownMs,
+    description: "对前方最多4名敌人各造成140%伤害",
+  },
+  {
+    id: "shadow-flurry",
+    heroId: "H06",
+    name: "影袭连刺",
+    cooldownMs: HERO_ULTIMATE_COMBAT.H06.cooldownMs,
+    description: "对生命比例最低的敌人连续造成4次90%伤害",
+  },
+  {
+    id: "blizzard",
+    heroId: "H07",
+    name: "暴风雪",
+    cooldownMs: HERO_ULTIMATE_COMBAT.H07.cooldownMs,
+    description: "大范围造成240%伤害并减速45%持续4秒",
+  },
+  {
+    id: "thunderstorm",
+    heroId: "H08",
+    name: "雷暴",
+    cooldownMs: HERO_ULTIMATE_COMBAT.H08.cooldownMs,
+    description: "在最多5名敌人间跳跃，末跳小幅眩晕",
+  },
+] as const;
+
+export const AWAKENING_SKILLS: readonly SkillDefinition[] = [
+  { id: "unyielding", heroId: "H01", name: "不屈", description: "格挡率 +8%；坚守在生命 50% 时触发" },
+  { id: "frenzy", heroId: "H02", name: "狂怒", description: "低血时吸血 6%；血性攻速提高到 40%" },
+  { id: "wildfire", heroId: "H03", name: "焚天", description: "溅射范围扩大；余烬最多保留两层" },
+  { id: "morning-prayer", heroId: "H04", name: "晨祷", description: "治疗强度 +10%；溢出护盾上限提高" },
+  { id: "hunter-mark", heroId: "H05", name: "猎手", description: "暴击率 +5%；可贯穿第三个目标" },
+  { id: "kill-hunt", heroId: "H06", name: "猎杀", description: "对残血目标伤害 +12%；击杀后短暂加速" },
+  { id: "permafrost", heroId: "H07", name: "极寒", description: "对被减速目标伤害 +10%；减速时有几率眩晕" },
+  { id: "storm-drum", heroId: "H08", name: "雷鼓", description: "全队常驻攻速 +6%" },
+] as const;
+
 export const ACTIVE_SKILL_BY_HERO = Object.fromEntries(
   ACTIVE_SKILLS.map((skill) => [skill.heroId, skill]),
 ) as Record<HeroId, SkillDefinition>;
 
 export const PASSIVE_SKILL_BY_HERO = Object.fromEntries(
   PASSIVE_SKILLS.map((skill) => [skill.heroId, skill]),
+) as Record<HeroId, SkillDefinition>;
+
+export const ULTIMATE_SKILL_BY_HERO = Object.fromEntries(
+  ULTIMATE_SKILLS.map((skill) => [skill.heroId, skill]),
+) as Record<HeroId, SkillDefinition>;
+
+export const AWAKENING_SKILL_BY_HERO = Object.fromEntries(
+  AWAKENING_SKILLS.map((skill) => [skill.heroId, skill]),
 ) as Record<HeroId, SkillDefinition>;

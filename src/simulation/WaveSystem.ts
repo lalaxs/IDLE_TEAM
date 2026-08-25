@@ -1,4 +1,4 @@
-import { ENEMY_BY_ID } from "../content/enemies";
+import { ENEMY_BY_ID, resolveEnemyDamageElement } from "../content/enemies";
 import {
   enemyAtkMultiplier,
   enemyDefMultiplier,
@@ -94,12 +94,14 @@ export function createEnemyUnits(
       maxHp,
       attack: Math.round(definition.attack * atkMult),
       defense: Math.round(definition.defense * defMult),
+      damageElement: resolveEnemyDamageElement(enemyId, stage),
       critChance: 0.05,
       attackRange: definition.attackRange,
       moveSpeed: definition.moveSpeed,
       attackIntervalMs: definition.attackIntervalMs,
       attackCooldownMs: 500 + index * 120,
       skillCooldownMs: enemyId === "B01" ? 5000 : Number.POSITIVE_INFINITY,
+      ultimateCooldownMs: Number.POSITIVE_INFINITY,
       targetId: null,
       shield: 0,
       statuses: [],

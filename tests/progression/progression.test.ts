@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  canAscendHero,
+  getHeroLevelCap,
   getHeroStats,
+  getStarFlatDelta,
+  getStarUpgradeCost,
   getUpgradeCost,
 } from "../../src/progression/HeroProgression";
 import {
@@ -23,13 +27,26 @@ const frostTraitRandom: RandomSource = {
 
 describe("hero progression", () => {
   it("uses the approved level curves", () => {
-    expect(getUpgradeCost(1)).toBe(80);
-    expect(getUpgradeCost(2)).toBe(118);
+    expect(getUpgradeCost(1)).toBe(60);
+    expect(getUpgradeCost(2)).toBe(65);
     expect(getHeroStats("H01", 2)).toMatchObject({
-      maxHp: 1643,
-      attack: 98,
-      defense: 70,
+      maxHp: 1539,
+      attack: 92,
+      defense: 66,
     });
+  });
+
+  it("caps level by ascend rank and keeps star flats through ascend percent", () => {
+    expect(getHeroLevelCap(0)).toBe(20);
+    expect(getHeroLevelCap(1)).toBe(40);
+    expect(getHeroLevelCap(5)).toBe(100);
+    expect(canAscendHero(5, 0, 19)).toBe(false);
+    expect(canAscendHero(5, 0, 20)).toBe(true);
+    expect(getStarUpgradeCost(0, 1)).toBe(28);
+    const flats = getStarFlatDelta("H01", 1);
+    expect(getHeroStats("H01", 1, { starFlatHp: flats.maxHp, ascendLevel: 2 }).maxHp).toBe(
+      Math.round((1500 + flats.maxHp) * 1.08),
+    );
   });
 });
 

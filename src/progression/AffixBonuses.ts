@@ -37,14 +37,8 @@ function applyAffixRoll(roll: AffixRoll, bonus: HeroBattleBonus): void {
     case "cooldown_reduction":
       bonus.skillCooldownPct = (bonus.skillCooldownPct ?? 0) + roll.value / 100;
       break;
-    case "life_pct":
-      bonus.maxHpPct = (bonus.maxHpPct ?? 0) + roll.value / 100;
-      break;
     case "damage_reduction":
       bonus.damageReductionPct = (bonus.damageReductionPct ?? 0) + roll.value / 100;
-      break;
-    case "defense_pct":
-      bonus.defensePct = (bonus.defensePct ?? 0) + roll.value / 100;
       break;
     case "flat_attack":
       bonus.attack = (bonus.attack ?? 0) + roll.value;
@@ -78,6 +72,42 @@ function applyAffixRoll(roll: AffixRoll, bonus: HeroBattleBonus): void {
       break;
     case "magic_damage_pct":
       bonus.magicDamagePct = (bonus.magicDamagePct ?? 0) + roll.value / 100;
+      break;
+    case "fire_damage_pct":
+      bonus.fireDamagePct = (bonus.fireDamagePct ?? 0) + roll.value / 100;
+      break;
+    case "frost_damage_pct":
+      bonus.frostDamagePct = (bonus.frostDamagePct ?? 0) + roll.value / 100;
+      break;
+    case "lightning_damage_pct":
+      bonus.lightningDamagePct = (bonus.lightningDamagePct ?? 0) + roll.value / 100;
+      break;
+    case "dark_damage_pct":
+      bonus.darkDamagePct = (bonus.darkDamagePct ?? 0) + roll.value / 100;
+      break;
+    case "holy_heal_pct":
+      bonus.healPowerPct = (bonus.healPowerPct ?? 0) + roll.value / 100;
+      break;
+    case "physical_resist":
+      bonus.physicalResistPct = (bonus.physicalResistPct ?? 0) + roll.value / 100;
+      break;
+    case "fire_resist":
+      bonus.fireResistPct = (bonus.fireResistPct ?? 0) + roll.value / 100;
+      break;
+    case "frost_resist":
+      bonus.frostResistPct = (bonus.frostResistPct ?? 0) + roll.value / 100;
+      break;
+    case "lightning_resist":
+      bonus.lightningResistPct = (bonus.lightningResistPct ?? 0) + roll.value / 100;
+      break;
+    case "dark_resist":
+      bonus.darkResistPct = (bonus.darkResistPct ?? 0) + roll.value / 100;
+      break;
+    case "holy_resist":
+      bonus.holyResistPct = (bonus.holyResistPct ?? 0) + roll.value / 100;
+      break;
+    case "all_resist":
+      bonus.allResistPct = (bonus.allResistPct ?? 0) + roll.value / 100;
       break;
   }
 }

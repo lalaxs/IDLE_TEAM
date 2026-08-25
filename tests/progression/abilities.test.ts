@@ -8,6 +8,7 @@ import {
   getAbilityUpgradeCost,
   getBackpackCapacity,
   getChestProgressBonus,
+  getGoldDropChance,
   normalizeAbilityLevels,
 } from "../../src/progression/AbilitySystem";
 import { ABILITY_BY_ID, ABILITY_DEFINITIONS } from "../../src/content/abilities";
@@ -29,14 +30,30 @@ describe("ability upgrades", () => {
     expect(applyGoldAbilityBonus(100, levels)).toBe(Math.round((100 + 20) * 1.1));
   });
 
-  it("boosts stage gold when abilities are provided", () => {
+  it("boosts stage gold when amount abilities are provided", () => {
     const base = generateStageRewards(1, 42).gold;
     const levels = createDefaultAbilityLevels();
     levels.gold_flat = 5;
     levels.gold_percent = 20;
     const boosted = generateStageRewards(1, 42, levels).gold;
-    expect(boosted).toBe(applyGoldAbilityBonus(base, levels));
-    expect(boosted).toBeGreaterThan(base);
+    // Same drop rolls (chance unchanged); amount abilities scale the payout.
+    expect(boosted).toBe(base > 0 ? applyGoldAbilityBonus(base, levels) : 0);
+    if (base > 0) expect(boosted).toBeGreaterThan(base);
+  });
+
+  it("raises gold drop chance with the gold_drop_chance ability", () => {
+    const levels = createDefaultAbilityLevels();
+    expect(getGoldDropChance()).toBeCloseTo(0.15, 5);
+    levels.gold_drop_chance = 10;
+    expect(getGoldDropChance(levels)).toBeCloseTo(0.25, 5);
+
+    let baseTotal = 0;
+    let boostedTotal = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      baseTotal += generateStageRewards(8, seed).gold;
+      boostedTotal += generateStageRewards(8, seed, levels).gold;
+    }
+    expect(boostedTotal).toBeGreaterThan(baseTotal);
   });
 
   it("persists ability levels through save repair", () => {

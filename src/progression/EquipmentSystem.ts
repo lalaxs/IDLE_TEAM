@@ -23,9 +23,15 @@ import {
   type Rarity,
 } from "../content/rarities";
 import { BASE_TIER_MULTIPLIER, itemBudgetBase } from "../content/balance";
+import { MATERIAL_BY_ID, type MaterialId } from "../content/materials";
 import type { RandomSource } from "../simulation/RandomSource";
 
 export type { AffixRoll };
+
+/** Open gem socket on an equipment piece (max 2). */
+export interface ItemSocket {
+  gemId: string | null;
+}
 
 export interface InventoryItem {
   instanceId: string;
@@ -41,6 +47,13 @@ export interface InventoryItem {
   }>;
   affixes: AffixRoll[];
   traitId: string | null;
+  /** Opened gem sockets; length 0–2. Missing on legacy saves until normalized. */
+  sockets?: ItemSocket[];
+  /**
+   * Index of the only affix that may be reset on this item.
+   * null/undefined = never reset yet (player may pick any one affix once).
+   */
+  resetAffixIndex?: number | null;
 }
 
 const INHERENT_ROLL_MIN = 0.85;
@@ -198,6 +211,7 @@ export function createEquipment(
     stats,
     affixes,
     traitId,
+    sockets: [],
   };
 }
 
@@ -367,6 +381,15 @@ export function normalizeInventoryItem(raw: unknown): InventoryItem | null {
   const slot = definition?.slot ?? declaredSlot;
   if (definition && definition.slot !== declaredSlot) return null;
   if (!isRarity(source.rarity)) return null;
+  const affixes = normalizeAffixes(source.affixes);
+  const rawReset = (source as { resetAffixIndex?: unknown }).resetAffixIndex;
+  const resetAffixIndex =
+    typeof rawReset === "number" &&
+    Number.isInteger(rawReset) &&
+    rawReset >= 0 &&
+    rawReset < affixes.length
+      ? rawReset
+      : null;
   return {
     instanceId: source.instanceId,
     definitionId: source.definitionId,
@@ -374,9 +397,30 @@ export function normalizeInventoryItem(raw: unknown): InventoryItem | null {
     rarity: source.rarity,
     stage: typeof source.stage === "number" ? source.stage : 1,
     stats: source.stats && typeof source.stats === "object" ? source.stats : {},
-    affixes: normalizeAffixes(source.affixes),
+    affixes,
     traitId: typeof source.traitId === "string" ? source.traitId : null,
+    sockets: normalizeItemSockets(source.sockets),
+    resetAffixIndex,
   };
+}
+
+function normalizeItemSockets(raw: unknown): ItemSocket[] {
+  if (!Array.isArray(raw)) return [];
+  const result: ItemSocket[] = [];
+  for (const entry of raw) {
+    if (result.length >= 2) break;
+    if (!entry || typeof entry !== "object") {
+      result.push({ gemId: null });
+      continue;
+    }
+    const gemId = (entry as { gemId?: unknown }).gemId;
+    if (typeof gemId === "string" && MATERIAL_BY_ID[gemId as MaterialId]?.kind === "gem") {
+      result.push({ gemId });
+    } else {
+      result.push({ gemId: null });
+    }
+  }
+  return result;
 }
 
 void NATURAL_DROP_GRADES;

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { ASSET_MANIFEST } from "../assets/manifest";
 import { CHARACTER_FOOT_X, getBattleBackgroundKeys } from "../content/battleBackgrounds";
+import { DAMAGE_ELEMENT_COLOR } from "../content/damageElements";
 import { SceneBridge, type BattleViewAdapter } from "./SceneBridge";
 import {
   calculateBattleCameraX,
@@ -278,7 +279,18 @@ export class BattleScene extends Phaser.Scene implements BattleViewAdapter {
   playEvent(event: BattleEvent): void {
     if (event.type === "damage") {
       const view = this.unitViews.get(event.targetId);
-      if (view) this.floatText(view.container.x, view.container.y - 58, `${event.critical ? "✦ " : "−"}${event.amount}`, event.critical ? "#f4cf58" : "#fff4e4", event.critical ? 18 : 13);
+      if (view) {
+        const color = event.critical
+          ? "#f4cf58"
+          : DAMAGE_ELEMENT_COLOR[event.element ?? "physical"] ?? "#fff4e4";
+        this.floatText(
+          view.container.x,
+          view.container.y - 58,
+          `${event.critical ? "✦ " : "−"}${event.amount}`,
+          color,
+          event.critical ? 18 : 13,
+        );
+      }
     } else if (event.type === "heal") {
       const view = this.unitViews.get(event.targetId);
       if (view) this.floatText(view.container.x, view.container.y - 58, `+${event.amount}`, "#b7ea86", 14);

@@ -1,7 +1,14 @@
 import { applyItemToBonus } from "./AffixBonuses";
 import type { InventoryItem } from "./EquipmentSystem";
-import { getHeroStats } from "./HeroProgression";
+import {
+  getHeroStats,
+  getStarSkillCooldownPct,
+  getStarSkillDamagePct,
+  type HeroStatGrowth,
+} from "./HeroProgression";
+import { applyTalentBonus } from "./TalentSystem";
 import { ITEM_BY_ID } from "../content/items";
+import { MATERIAL_BY_ID, type MaterialId } from "../content/materials";
 import { activeSetBonuses, type SetId } from "../content/sets";
 import { rarityHasLegendaryTrait } from "../content/rarities";
 import { BASE_CRIT_MULTIPLIER } from "../content/balance";
@@ -12,10 +19,27 @@ import {
   DODGE_CHANCE_CAP,
   SKILL_COOLDOWN_REDUCTION_CAP,
 } from "../content/affixes";
-import type { SaveDataV1 } from "../persistence/schema";
+import {
+  allResistFromDefense,
+  clampElementResist,
+  type DamageElement,
+} from "../content/damageElements";
 import { applyCombatAbilityBonus } from "./AbilitySystem";
 import type { HeroBattleBonus } from "../simulation/BattleSimulation";
 import type { HeroId } from "../simulation/types";
+import type { HeroProgress, SaveDataV1 } from "../persistence/schema";
+
+function applyGemBonuses(item: InventoryItem, bonus: HeroBattleBonus): void {
+  for (const socket of item.sockets ?? []) {
+    if (!socket.gemId) continue;
+    const gem = MATERIAL_BY_ID[socket.gemId as MaterialId];
+    if (!gem?.gemBonus) continue;
+    if (gem.gemBonus.attack) bonus.attack = (bonus.attack ?? 0) + gem.gemBonus.attack;
+    if (gem.gemBonus.maxHp) bonus.maxHp = (bonus.maxHp ?? 0) + gem.gemBonus.maxHp;
+    if (gem.gemBonus.defense) bonus.defense = (bonus.defense ?? 0) + gem.gemBonus.defense;
+    if (gem.gemBonus.critRate) bonus.critChance = (bonus.critChance ?? 0) + gem.gemBonus.critRate;
+  }
+}
 
 function applyTraitBonuses(item: InventoryItem, bonus: HeroBattleBonus): void {
   const high = rarityHasLegendaryTrait(item.rarity);
@@ -75,6 +99,7 @@ export function getEquipmentBonuses(save: SaveDataV1): Partial<Record<HeroId, He
     const setCounts: Partial<Record<SetId, number>> = {};
     for (const item of items) {
       applyItemToBonus(item, bonus);
+      applyGemBonuses(item, bonus);
       const definition = ITEM_BY_ID[item.definitionId];
       if (definition?.setId) {
         setCounts[definition.setId] = (setCounts[definition.setId] ?? 0) + 1;
@@ -92,9 +117,21 @@ export function getEquipmentBonuses(save: SaveDataV1): Partial<Record<HeroId, He
       if (setBonus.critDamagePct) bonus.critDamagePct = (bonus.critDamagePct ?? 0) + setBonus.critDamagePct;
       if (setBonus.eliteDamagePct) bonus.eliteDamagePct = (bonus.eliteDamagePct ?? 0) + setBonus.eliteDamagePct / 100;
     }
+    applyHeroProgressionBonus(heroId, progress, bonus);
     result[heroId] = applyCombatAbilityBonus(bonus, save.abilities);
   }
   return result;
+}
+
+function applyHeroProgressionBonus(heroId: HeroId, progress: HeroProgress, bonus: HeroBattleBonus): void {
+  const stars = progress.stars ?? 0;
+  bonus.skillDamagePct = (bonus.skillDamagePct ?? 0) + getStarSkillDamagePct(stars);
+  bonus.skillCooldownPct = (bonus.skillCooldownPct ?? 0) + getStarSkillCooldownPct(stars);
+  applyTalentBonus(progress.talentRanks ?? {}, heroId, bonus);
+  if (progress.chosenSkillId) {
+    bonus.ultimateUnlocked = true;
+    bonus.chosenSkillId = progress.chosenSkillId;
+  }
 }
 
 export interface HeroCombatDisplayStats {
@@ -109,15 +146,27 @@ export interface HeroCombatDisplayStats {
   moveSpeed: number;
   moveSpeedPct: number;
   damageSchool: "physical" | "magic";
+  damageElement: DamageElement;
   damagePct: number;
   primaryAttackPct: number;
   skillDamagePct: number;
   physicalDamagePct: number;
   magicDamagePct: number;
+  fireDamagePct: number;
+  frostDamagePct: number;
+  lightningDamagePct: number;
+  darkDamagePct: number;
+  healPowerPct: number;
   eliteDamagePct: number;
   skillCooldownPct: number;
   skillCooldownMs: number;
   damageReductionPct: number;
+  physicalResistPct: number;
+  fireResistPct: number;
+  frostResistPct: number;
+  lightningResistPct: number;
+  darkResistPct: number;
+  holyResistPct: number;
   lifeOnHit: number;
   lifeStealPct: number;
   hpRegenPerSec: number;
@@ -142,16 +191,21 @@ export function getHeroCombatDisplayStats(
   heroId: HeroId,
   level: number,
   bonus: HeroBattleBonus = {},
+  growth: HeroStatGrowth = {},
 ): HeroCombatDisplayStats {
   const definition = HERO_BY_ID[heroId];
-  const levelStats = getHeroStats(heroId, level);
+  const levelStats = getHeroStats(heroId, level, growth);
   const attackSpeedPct = bonus.attackSpeedPct ?? 0;
   const skillCooldownPct = Math.min(SKILL_COOLDOWN_REDUCTION_CAP, bonus.skillCooldownPct ?? 0);
   const baseSkillCd = ACTIVE_SKILL_BY_HERO[heroId].cooldownMs ?? 6000;
+  const maxHp = Math.round((levelStats.maxHp + (bonus.maxHp ?? 0)) * (1 + (bonus.maxHpPct ?? 0)));
+  const defense = Math.round((levelStats.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0)));
+  const resistOf = (element: DamageElement, specific: number): number =>
+    clampElementResist(allResistFromDefense(defense) + (bonus.allResistPct ?? 0) + specific) * 100;
   return {
-    maxHp: Math.round((levelStats.maxHp + (bonus.maxHp ?? 0)) * (1 + (bonus.maxHpPct ?? 0))),
-    attack: levelStats.attack + (bonus.attack ?? 0),
-    defense: Math.round((levelStats.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0))),
+    maxHp,
+    attack: Math.round((levelStats.attack + (bonus.attack ?? 0)) * (1 + (bonus.attackPct ?? 0))),
+    defense,
     critChancePct: (0.05 + (bonus.critChance ?? 0)) * 100,
     critDamagePct: (BASE_CRIT_MULTIPLIER + (bonus.critDamagePct ?? 0) / 100) * 100,
     attackIntervalMs: Math.round(definition.attackIntervalMs / (1 + attackSpeedPct / 100)),
@@ -160,18 +214,30 @@ export function getHeroCombatDisplayStats(
     moveSpeed: definition.moveSpeed * (1 + (bonus.moveSpeedPct ?? 0) / 100),
     moveSpeedPct: bonus.moveSpeedPct ?? 0,
     damageSchool: definition.damageSchool,
+    damageElement: definition.damageElement,
     damagePct: (bonus.damagePct ?? 0) * 100,
     primaryAttackPct: (bonus.primaryAttackPct ?? 0) * 100,
     skillDamagePct: (bonus.skillDamagePct ?? 0) * 100,
     physicalDamagePct: (bonus.physicalDamagePct ?? 0) * 100,
     magicDamagePct: (bonus.magicDamagePct ?? 0) * 100,
+    fireDamagePct: (bonus.fireDamagePct ?? 0) * 100,
+    frostDamagePct: (bonus.frostDamagePct ?? 0) * 100,
+    lightningDamagePct: (bonus.lightningDamagePct ?? 0) * 100,
+    darkDamagePct: (bonus.darkDamagePct ?? 0) * 100,
+    healPowerPct: (bonus.healPowerPct ?? 0) * 100,
     eliteDamagePct: (bonus.eliteDamagePct ?? 0) * 100,
     skillCooldownPct: skillCooldownPct * 100,
     skillCooldownMs: Math.round(baseSkillCd * (1 - skillCooldownPct)),
     damageReductionPct: (bonus.damageReductionPct ?? 0) * 100,
+    physicalResistPct: resistOf("physical", bonus.physicalResistPct ?? 0),
+    fireResistPct: resistOf("fire", bonus.fireResistPct ?? 0),
+    frostResistPct: resistOf("frost", bonus.frostResistPct ?? 0),
+    lightningResistPct: resistOf("lightning", bonus.lightningResistPct ?? 0),
+    darkResistPct: resistOf("dark", bonus.darkResistPct ?? 0),
+    holyResistPct: resistOf("holy", bonus.holyResistPct ?? 0),
     lifeOnHit: bonus.lifeOnHit ?? 0,
     lifeStealPct: (bonus.lifeStealPct ?? 0) * 100,
-    hpRegenPerSec: bonus.hpRegenPerSec ?? 0,
+    hpRegenPerSec: (bonus.hpRegenPerSec ?? 0) + maxHp * (bonus.hpRegenMaxHpPct ?? 0),
     dodgeChancePct: Math.min(DODGE_CHANCE_CAP, bonus.dodgeChance ?? 0) * 100,
     blockChancePct: Math.min(BLOCK_CHANCE_CAP, bonus.blockChance ?? 0) * 100,
     executeDamagePct: (bonus.executeDamagePct ?? 0) * 100,

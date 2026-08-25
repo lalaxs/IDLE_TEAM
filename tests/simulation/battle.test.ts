@@ -31,6 +31,28 @@ describe("BattleSimulation", () => {
     expect(["waveIntro", "advancing"]).toContain(snapshot.state);
   });
 
+  it("assigns each hero their combat damage element", () => {
+    const battle = new BattleSimulation({
+      stage: 1,
+      party: ["H01", "H03", "H04", "H06", "H08"],
+      heroLevels: {},
+      seed: 10,
+      startWithTravel: false,
+    });
+    const byHero = Object.fromEntries(
+      battle.getSnapshot().units
+        .filter(({ team }) => team === "heroes")
+        .map((unit) => [unit.sourceId, unit.damageElement]),
+    );
+    expect(byHero).toMatchObject({
+      H01: "physical",
+      H03: "fire",
+      H04: "holy",
+      H06: "dark",
+      H08: "lightning",
+    });
+  });
+
   it("pauses in place after a pack clear before the next enemies arrive", () => {
     const battle = new BattleSimulation({
       stage: 1,
@@ -437,7 +459,7 @@ describe("BattleSimulation", () => {
       stage: 48,
       party: ["H01"],
       heroLevels: {},
-      heroBonuses: { H01: { mirageGuardPct: 0.2 } },
+      heroBonuses: { H01: { mirageGuardPct: 0.2, maxHpPct: 1.5 } },
       seed: 12,
     });
     let hero = battle.getSnapshot().units.find(({ sourceId }) => sourceId === "H01");

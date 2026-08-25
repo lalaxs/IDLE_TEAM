@@ -9,6 +9,7 @@ export type HeroId =
   | "H08";
 
 export type EnemyId = "E01" | "E02" | "E03" | "E04" | "B01";
+export type DamageElement = "physical" | "fire" | "frost" | "lightning" | "dark" | "holy";
 export type Team = "heroes" | "enemies";
 export type TargetStrategy =
   | "nearestEnemy"
@@ -35,18 +36,22 @@ export interface UnitState {
   maxHp: number;
   attack: number;
   defense: number;
+  /** Outgoing attack school; monster hits are mitigated by matching hero resist. */
+  damageElement: DamageElement;
   critChance: number;
   attackRange: number;
   moveSpeed: number;
   attackIntervalMs: number;
   attackCooldownMs: number;
   skillCooldownMs: number;
+  ultimateCooldownMs: number;
   targetId: string | null;
   shield: number;
   statuses: StatusInstance[];
   alive: boolean;
   basicAttackCount: number;
   skillCastCount: number;
+  chosenSkillId?: string | null;
   passiveFlags: Record<string, boolean | number>;
 }
 
@@ -64,7 +69,7 @@ export type BattleState =
 export type BattleEvent =
   | { type: "wave:started"; wave: number }
   | { type: "attack"; sourceId: string; targetId: string; ranged: boolean }
-  | { type: "damage"; sourceId: string; targetId: string; amount: number; critical: boolean }
+  | { type: "damage"; sourceId: string; targetId: string; amount: number; critical: boolean; element?: DamageElement }
   | { type: "heal"; sourceId: string; targetId: string; amount: number }
   | { type: "skill:started"; sourceId: string; skillId: string }
   | { type: "skill:resolved"; sourceId: string; skillId: string; targetIds: string[] }

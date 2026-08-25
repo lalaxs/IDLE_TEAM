@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   AFFIX_COUNT_BY_RARITY,
   AFFIX_BY_ID,
+  formatAffixValue,
   getAffixesForSlot,
+  getAffixValueBounds,
 } from "../../src/content/affixes";
 import { applyItemToBonus } from "../../src/progression/AffixBonuses";
 import {
@@ -52,7 +54,7 @@ describe("TBH-aligned equipment affixes", () => {
 
   it("keeps armor-side defenses off weapons", () => {
     expect(AFFIX_BY_ID.damage_reduction.slots.includes("main_weapon")).toBe(false);
-    expect(AFFIX_BY_ID.defense_pct.slots.includes("main_weapon")).toBe(false);
+    expect(AFFIX_BY_ID.flat_defense.slots.includes("main_weapon")).toBe(false);
     expect(AFFIX_BY_ID.damage_reduction.slots.includes("armor")).toBe(true);
     expect(AFFIX_BY_ID.cooldown_reduction.slots.includes("main_weapon")).toBe(true);
   });
@@ -90,7 +92,7 @@ describe("TBH-aligned equipment affixes", () => {
         stage: 5,
         stats: { defense: 20, maxHp: 200 },
         affixes: [
-          { affixId: "defense_pct", value: 8 },
+          { affixId: "flat_defense", value: 18 },
           { affixId: "hp_regen", value: 12 },
           { affixId: "block_chance", value: 4 },
         ],
@@ -98,7 +100,7 @@ describe("TBH-aligned equipment affixes", () => {
       },
       bonus,
     );
-    expect(bonus.defensePct).toBeCloseTo(0.08);
+    expect(bonus.defense).toBe(38);
     expect(bonus.hpRegenPerSec).toBe(12);
     expect(bonus.blockChance).toBeCloseTo(0.04);
   });
@@ -132,6 +134,8 @@ describe("TBH-aligned equipment affixes", () => {
         affixes: [
           { affixId: "physical_damage_pct", value: 8 },
           { affixId: "magic_damage_pct", value: 7 },
+          { affixId: "fire_damage_pct", value: 15 },
+          { affixId: "frost_damage_pct", value: 12 },
         ],
         traitId: null,
       },
@@ -141,6 +145,108 @@ describe("TBH-aligned equipment affixes", () => {
     expect(bonus.moveSpeedPct).toBe(5);
     expect(bonus.physicalDamagePct).toBeCloseTo(0.08);
     expect(bonus.magicDamagePct).toBeCloseTo(0.07);
+    expect(bonus.fireDamagePct).toBeCloseTo(0.15);
+    expect(bonus.frostDamagePct).toBeCloseTo(0.12);
+  });
+
+  it("maps holy heal power into outgoing heal bonus", () => {
+    const bonus: HeroBattleBonus = {};
+    applyItemToBonus(
+      {
+        instanceId: "h",
+        definitionId: "weapon_guard_blade",
+        slot: "main_weapon",
+        rarity: "epic",
+        stage: 5,
+        stats: { attack: 40 },
+        affixes: [{ affixId: "holy_heal_pct", value: 15 }],
+        traitId: null,
+      },
+      bonus,
+    );
+    expect(bonus.healPowerPct).toBeCloseTo(0.15);
+    expect(AFFIX_BY_ID.holy_heal_pct.ranges.epic.min).toBeGreaterThan(AFFIX_BY_ID.magic_damage_pct.ranges.epic.max);
+    expect(AFFIX_BY_ID.holy_heal_pct.ranges.epic.min).toBeGreaterThan(AFFIX_BY_ID.damage_pct.ranges.epic.max);
+    expect(AFFIX_BY_ID.holy_heal_pct.slots.includes("main_weapon")).toBe(true);
+    expect(AFFIX_BY_ID.holy_heal_pct.slots.includes("armor")).toBe(false);
+  });
+
+  it("keeps a clear staircase from generic to precise damage affixes", () => {
+    const allDamage = AFFIX_BY_ID.damage_pct.ranges.epic;
+    const schoolDamage = AFFIX_BY_ID.magic_damage_pct.ranges.epic;
+    expect(AFFIX_BY_ID.physical_damage_pct.ranges.epic).toEqual(schoolDamage);
+    expect(schoolDamage.max).toBeGreaterThan(allDamage.max);
+    expect(schoolDamage.min).toBeGreaterThanOrEqual(allDamage.min);
+    for (const id of [
+      "fire_damage_pct",
+      "frost_damage_pct",
+      "lightning_damage_pct",
+      "dark_damage_pct",
+      "holy_heal_pct",
+    ] as const) {
+      const range = AFFIX_BY_ID[id].ranges.epic;
+      expect(range.min).toBeGreaterThan(schoolDamage.max);
+      expect(range.min).toBeGreaterThan(allDamage.max);
+      expect(AFFIX_BY_ID[id].slots.includes("main_weapon")).toBe(true);
+      expect(AFFIX_BY_ID[id].slots.includes("armor")).toBe(false);
+    }
+  });
+
+  it("maps elemental resist affixes on armor and not weapons", () => {
+    expect(AFFIX_BY_ID.fire_resist.slots.includes("main_weapon")).toBe(false);
+    expect(AFFIX_BY_ID.fire_resist.slots.includes("armor")).toBe(true);
+    expect(AFFIX_BY_ID.holy_resist.slots.includes("armor")).toBe(true);
+    expect(AFFIX_BY_ID.holy_resist.slots.includes("main_weapon")).toBe(false);
+    expect(AFFIX_BY_ID.all_resist.slots.includes("armor")).toBe(true);
+    expect(AFFIX_BY_ID.all_resist.slots.includes("boots")).toBe(false);
+
+    const bonus: HeroBattleBonus = {};
+    applyItemToBonus(
+      {
+        instanceId: "r",
+        definitionId: "armor_guard_mail",
+        slot: "armor",
+        rarity: "epic",
+        stage: 5,
+        stats: { defense: 20 },
+        affixes: [
+          { affixId: "fire_resist", value: 8 },
+          { affixId: "frost_resist", value: 6 },
+          { affixId: "all_resist", value: 3 },
+          { affixId: "holy_resist", value: 7 },
+        ],
+        traitId: null,
+      },
+      bonus,
+    );
+    expect(bonus.fireResistPct).toBeCloseTo(0.08);
+    expect(bonus.frostResistPct).toBeCloseTo(0.06);
+    expect(bonus.allResistPct).toBeCloseTo(0.03);
+    expect(bonus.holyResistPct).toBeCloseTo(0.07);
+  });
+
+  it("scales resist affixes from item budget and keeps specific resist 1.5–2× all-resist", () => {
+    expect(AFFIX_BY_ID.fire_resist.kind).toBe("percent_budget");
+    expect(AFFIX_BY_ID.all_resist.kind).toBe("percent_budget");
+    expect(formatAffixValue("fire_resist", 12)).toBe("火焰抗性 +12%");
+    expect(formatAffixValue("all_resist", 7)).toBe("全元素抗性 +7%");
+
+    const budget = 100;
+    const all = getAffixValueBounds("all_resist", "epic", budget);
+    for (const id of [
+      "physical_resist",
+      "fire_resist",
+      "frost_resist",
+      "lightning_resist",
+      "dark_resist",
+      "holy_resist",
+    ] as const) {
+      const specific = getAffixValueBounds(id, "epic", budget);
+      expect(specific.min / all.min).toBeGreaterThanOrEqual(1.5);
+      expect(specific.min / all.min).toBeLessThanOrEqual(2);
+      expect(specific.max / all.max).toBeGreaterThanOrEqual(1.5);
+      expect(specific.max / all.max).toBeLessThanOrEqual(2);
+    }
   });
 
   it("parses inventory items with current slot ids", () => {

@@ -52,11 +52,29 @@ export function describeAbilityEffect(abilityId: AbilityId, level: number): stri
   return `当前 +${pretty}`;
 }
 
+/** Base chance for an enemy to drop gold on stage clear settlement. */
+export const GOLD_DROP_CHANCE_BASE = 0.15;
+
 /** Apply purchased gold abilities: (base + flat) * (1 + percent). */
 export function applyGoldAbilityBonus(baseGold: number, levels: AbilityLevels): number {
   const flat = getAbilityEffectValue("gold_flat", levels.gold_flat);
   const percent = getAbilityEffectValue("gold_percent", levels.gold_percent);
   return Math.round((baseGold + flat) * (1 + percent / 100));
+}
+
+/** Gold drop chance in [0, 1], base 15% plus ability bonus. */
+export function getGoldDropChance(levels?: AbilityLevels): number {
+  const bonus = levels
+    ? getAbilityEffectValue("gold_drop_chance", levels.gold_drop_chance) / 100
+    : 0;
+  return Math.min(1, Math.max(0, GOLD_DROP_CHANCE_BASE + bonus));
+}
+
+/** Apply purchased exp abilities: (base + flat) * (1 + percent). */
+export function applyExpAbilityBonus(baseExp: number, levels: AbilityLevels): number {
+  const flat = getAbilityEffectValue("exp_flat", levels.exp_flat);
+  const percent = getAbilityEffectValue("exp_percent", levels.exp_percent);
+  return Math.round((baseExp + flat) * (1 + percent / 100));
 }
 
 export function applyOfflineGoldAbilityBonus(baseGold: number, levels: AbilityLevels): number {
