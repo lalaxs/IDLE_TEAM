@@ -1,0 +1,302 @@
+{
+  "version": "1.0",
+  "region": "forest",
+  "batch_automated_status": "pass",
+  "batch_manual_status": "pass",
+  "checks": [
+    "1024×1024 RGBA",
+    "four transparent corners",
+    "minimum 60 px safety margin",
+    "visible coverage 0.08–0.60",
+    "partial alpha ratio ≤ 0.08",
+    "120 px manual silhouette review"
+  ],
+  "batch_notes": [
+    "E05–E08 在 120 px 下分别保留獾形棘带、石背蛙形、宽翼大耳与盘根双臂四种独立轮廓",
+    "B05–B08 的空心树桩、巨蛙石甲、根笼长臂与残碑蜥体均能对应 1-5～1-8 地图地标",
+    "Boss 的大结构与细节密度明显高于普通怪，且 B05、B07 两种木系 Boss 的宽体与纵向根笼轮廓互不混淆",
+    "透明边缘在浅色评审底上未见明显洋红色残边"
+  ],
+  "assets": [
+    {
+      "id": "E05",
+      "name": "荆棘獾",
+      "type": "normal",
+      "file": "e05_thorn-badger_concept_v01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha_bbox": [
+        72,
+        308,
+        952,
+        930
+      ],
+      "margins": [
+        72,
+        308,
+        72,
+        94
+      ],
+      "visible_coverage": 0.3704,
+      "partial_alpha_ratio": 0.0262,
+      "corners_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "automated_status": "pass",
+      "manual_thumbnail_status": "pass",
+      "manual_notes": [
+        "120 px 下奶白面纹和单条背部棘带清楚"
+      ]
+    },
+    {
+      "id": "E06",
+      "name": "苔背蛙",
+      "type": "normal",
+      "file": "e06_mossback-frog_concept_v01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha_bbox": [
+        72,
+        260,
+        952,
+        930
+      ],
+      "margins": [
+        72,
+        260,
+        72,
+        94
+      ],
+      "visible_coverage": 0.3775,
+      "partial_alpha_ratio": 0.0249,
+      "corners_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "automated_status": "pass",
+      "manual_thumbnail_status": "pass",
+      "manual_notes": [
+        "120 px 下圆蛙体和单块蓝灰苔石清楚"
+      ]
+    },
+    {
+      "id": "E07",
+      "name": "暮翼蝠",
+      "type": "normal",
+      "file": "e07_duskwing-bat_concept_v01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha_bbox": [
+        72,
+        610,
+        952,
+        930
+      ],
+      "margins": [
+        72,
+        610,
+        72,
+        94
+      ],
+      "visible_coverage": 0.1368,
+      "partial_alpha_ratio": 0.0592,
+      "corners_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "automated_status": "pass",
+      "manual_thumbnail_status": "pass",
+      "manual_notes": [
+        "120 px 下宽翼与叶形大耳仍形成清晰飞行轮廓"
+      ]
+    },
+    {
+      "id": "E08",
+      "name": "盘根卫",
+      "type": "elite",
+      "file": "e08_coiled-root-guard_concept_v01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha_bbox": [
+        72,
+        345,
+        952,
+        930
+      ],
+      "margins": [
+        72,
+        345,
+        72,
+        94
+      ],
+      "visible_coverage": 0.3163,
+      "partial_alpha_ratio": 0.0387,
+      "corners_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "automated_status": "pass",
+      "manual_thumbnail_status": "pass",
+      "manual_notes": [
+        "120 px 下盘根团身与两只螺旋粗臂可辨，精英体量成立"
+      ]
+    },
+    {
+      "id": "B05",
+      "name": "林口哨卫",
+      "type": "boss",
+      "file": "b05_forest-gate-sentry_concept_v01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha_bbox": [
+        72,
+        295,
+        952,
+        930
+      ],
+      "margins": [
+        72,
+        295,
+        72,
+        94
+      ],
+      "visible_coverage": 0.3941,
+      "partial_alpha_ratio": 0.0445,
+      "corners_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "automated_status": "pass",
+      "manual_thumbnail_status": "pass",
+      "manual_notes": [
+        "120 px 下空心木领、内嵌小头、肩枝和巨臂形成宽体 Boss 轮廓"
+      ]
+    },
+    {
+      "id": "B06",
+      "name": "暗溪巨蛙",
+      "type": "boss",
+      "file": "b06_dark-creek-giant-frog_concept_v01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha_bbox": [
+        72,
+        433,
+        952,
+        930
+      ],
+      "margins": [
+        72,
+        433,
+        72,
+        94
+      ],
+      "visible_coverage": 0.2707,
+      "partial_alpha_ratio": 0.036,
+      "corners_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "automated_status": "pass",
+      "manual_thumbnail_status": "pass",
+      "manual_notes": [
+        "120 px 下巨蛙宽头、石甲背脊和大蹼掌清楚，与 E06 分级明显"
+      ]
+    },
+    {
+      "id": "B07",
+      "name": "缠根树怪",
+      "type": "boss",
+      "file": "b07_entwined-root-tree-beast_concept_v01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha_bbox": [
+        72,
+        382,
+        952,
+        930
+      ],
+      "margins": [
+        72,
+        382,
+        72,
+        94
+      ],
+      "visible_coverage": 0.2222,
+      "partial_alpha_ratio": 0.0699,
+      "corners_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "automated_status": "pass",
+      "manual_thumbnail_status": "pass",
+      "manual_notes": [
+        "120 px 下纵向裂木核心与根笼长臂清楚，不与 B05 宽体树桩混淆"
+      ]
+    },
+    {
+      "id": "B08",
+      "name": "碑背巨蜥",
+      "type": "boss",
+      "file": "b08_steleback-giant-lizard_concept_v01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha_bbox": [
+        72,
+        381,
+        952,
+        930
+      ],
+      "margins": [
+        72,
+        381,
+        72,
+        94
+      ],
+      "visible_coverage": 0.2514,
+      "partial_alpha_ratio": 0.0396,
+      "corners_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "automated_status": "pass",
+      "manual_thumbnail_status": "pass",
+      "manual_notes": [
+        "120 px 下空白半截残碑、方头重腿和粗尾保持完整识别"
+      ]
+    }
+  ]
+}
