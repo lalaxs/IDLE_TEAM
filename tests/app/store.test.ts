@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { GameStore } from "../../src/app/GameStore";
+import { HERO_DEFINITIONS } from "../../src/content/heroes";
 import { createDefaultSave } from "../../src/persistence/schema";
 import { createEquipment } from "../../src/progression/EquipmentSystem";
 import { SeededRandom } from "../../src/simulation/RandomSource";
 
 describe("GameStore meta loop", () => {
-  it("unlocks H07 then H08 through the fixed demo summon sequence", () => {
+  it("unlocks H07 then H08 through the ordered summon sequence", () => {
     const save = createDefaultSave();
     const store = new GameStore(save);
     store.dispatch({ type: "summon:single" });
@@ -18,8 +19,9 @@ describe("GameStore meta loop", () => {
   it("emits summon results for unlocks and duplicate marks", () => {
     const save = createDefaultSave();
     save.gems = 1000;
-    save.roster.H07.unlocked = true;
-    save.roster.H08.unlocked = true;
+    for (const hero of HERO_DEFINITIONS) {
+      save.roster[hero.id].unlocked = true;
+    }
     const store = new GameStore(save);
     let resultCount = 0;
     store.subscribe((_state, events) => {

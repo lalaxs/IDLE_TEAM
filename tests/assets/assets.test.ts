@@ -7,7 +7,7 @@ import { getBattleBackgroundKeys } from "../../src/content/battleBackgrounds";
 describe("runtime character pack", () => {
   it("has a readable file for every hero and enemy", () => {
     const characterAssets = Object.values(ASSET_MANIFEST.characters);
-    expect(characterAssets).toHaveLength(13);
+    expect(characterAssets).toHaveLength(45);
     for (const publicPath of characterAssets) {
       const diskPath = resolve(process.cwd(), "public", publicPath.replace(/^\//, ""));
       expect(existsSync(diskPath), diskPath).toBe(true);

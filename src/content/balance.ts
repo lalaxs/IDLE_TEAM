@@ -11,6 +11,7 @@
 import type { ChapterId } from "./chapters";
 import { stageToChapter } from "./chapters";
 import type { HeroId } from "../simulation/types";
+import { HERO_ROSTER, type SkillPatternId } from "./heroRoster";
 
 /** Enemy HP growth per stage (DI: difficulty mostly stacks HP). */
 export const ENEMY_HP_GROWTH = 1.055;
@@ -120,8 +121,9 @@ export interface HeroSkillCombat {
 
 /**
  * DI-like primary skills: ~180–340% attack per cast, 5–8s CD.
+ * H09–H40 reuse H01–H08 combat patterns via heroRoster.skillPattern.
  */
-export const HERO_SKILL_COMBAT: Record<HeroId, HeroSkillCombat> = {
+const PATTERN_SKILL_COMBAT: Record<SkillPatternId, HeroSkillCombat> = {
   H01: {
     cooldownMs: 6000,
     hits: [{ multiplier: 1.85 }],
@@ -172,7 +174,7 @@ export const HERO_SKILL_COMBAT: Record<HeroId, HeroSkillCombat> = {
 };
 
 /** Ascend-1 ultimates: 10–13s, ~300–420% attack equivalent. */
-export const HERO_ULTIMATE_COMBAT: Record<HeroId, HeroSkillCombat> = {
+const PATTERN_ULTIMATE_COMBAT: Record<SkillPatternId, HeroSkillCombat> = {
   H01: {
     cooldownMs: 12000,
     hits: [{ multiplier: 2.2 }],
@@ -222,3 +224,11 @@ export const HERO_ULTIMATE_COMBAT: Record<HeroId, HeroSkillCombat> = {
     hasteMs: 3000,
   },
 };
+
+export const HERO_SKILL_COMBAT = Object.fromEntries(
+  HERO_ROSTER.map((hero) => [hero.id, PATTERN_SKILL_COMBAT[hero.skillPattern]]),
+) as Record<HeroId, HeroSkillCombat>;
+
+export const HERO_ULTIMATE_COMBAT = Object.fromEntries(
+  HERO_ROSTER.map((hero) => [hero.id, PATTERN_ULTIMATE_COMBAT[hero.skillPattern]]),
+) as Record<HeroId, HeroSkillCombat>;

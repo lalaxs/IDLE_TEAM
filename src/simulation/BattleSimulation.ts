@@ -309,13 +309,15 @@ export class BattleSimulation {
         applyHealing(unit, (hpRegen * deltaMs) / 1000, false);
       }
       const holdLine = Number(unit.passiveFlags.kitHoldLine ?? 0.4);
-      if (unit.sourceId === "H01" && unit.hp / unit.maxHp < holdLine && !unit.passiveFlags.hold) {
+      const holdPattern = HERO_BY_ID[unit.sourceId as HeroId]?.skillPattern === "H01";
+      if (holdPattern && unit.hp / unit.maxHp < holdLine && !unit.passiveFlags.hold) {
         applyStatus(unit, { kind: "damageReduction", magnitude: 0.15, remainingMs: 999_999, sourceId: unit.id });
         unit.passiveFlags.hold = true;
       }
       const bloodLine = Number(unit.passiveFlags.kitBloodLine ?? 0.45);
       const bloodHaste = Number(unit.passiveFlags.kitBloodHaste ?? 0.25);
-      if (unit.sourceId === "H02" && unit.hp / unit.maxHp < bloodLine && !unit.passiveFlags.blood) {
+      const bloodPattern = HERO_BY_ID[unit.sourceId as HeroId]?.skillPattern === "H02";
+      if (bloodPattern && unit.hp / unit.maxHp < bloodLine && !unit.passiveFlags.blood) {
         applyStatus(unit, { kind: "haste", magnitude: bloodHaste, remainingMs: 999_999, sourceId: unit.id });
         unit.passiveFlags.blood = true;
       }
@@ -377,8 +379,10 @@ export class BattleSimulation {
   }
 
   private basicAttack(source: UnitState): void {
+    const heroDef = source.team === "heroes" ? HERO_BY_ID[source.sourceId as HeroId] : undefined;
     const strategy =
-      source.sourceId === "H06" ? "lowestHpEnemy" : source.team === "enemies" ? "frontmostEnemy" : "nearestEnemy";
+      heroDef?.targetStrategy ??
+      (source.team === "enemies" ? "frontmostEnemy" : "nearestEnemy");
     const target = selectTarget(source, this.units, strategy);
     if (!target || Math.abs(target.x - source.x) > engageRange(source) + 4) return;
     let emberStacks = Number(source.passiveFlags.emberStacks ?? 0);
@@ -505,7 +509,10 @@ export class BattleSimulation {
       }
     }
     const rapidEvery = Math.max(1, Number(source.passiveFlags.kitRapidEvery ?? 4));
-    if (source.sourceId === "H05" && source.basicAttackCount % rapidEvery === 0) {
+    if (
+      HERO_BY_ID[source.sourceId as HeroId]?.skillPattern === "H05" &&
+      source.basicAttackCount % rapidEvery === 0
+    ) {
       applyStatus(source, { kind: "haste", magnitude: 0.2, remainingMs: 2500, sourceId: source.id });
     }
     if (source.sourceId === "E04" && source.basicAttackCount % 4 === 0) {

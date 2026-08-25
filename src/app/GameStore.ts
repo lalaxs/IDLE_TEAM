@@ -11,6 +11,7 @@ import {
   MAX_HERO_STARS,
 } from "../progression/HeroProgression";
 import { isHeroSkillId } from "../content/heroSkills";
+import { HERO_DEFINITIONS } from "../content/heroes";
 import {
   canLearnHeroSkill,
   talentUpgradeBlocked,
@@ -467,9 +468,11 @@ export class GameStore {
     }
     save.gems -= cost;
     const results: SummonPullResult[] = [];
+    const pool = HERO_DEFINITIONS.map(({ id }) => id);
     for (let index = 0; index < count; index += 1) {
+      const locked = pool.filter((id) => !save.roster[id].unlocked);
       const heroId: HeroId =
-        !save.roster.H07.unlocked ? "H07" : !save.roster.H08.unlocked ? "H08" : (["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08"][save.summonCount % 8] as HeroId);
+        locked[0] ?? pool[save.summonCount % pool.length]!;
       if (!save.roster[heroId].unlocked) {
         save.roster[heroId].unlocked = true;
         results.push({ kind: "unlock", heroId });

@@ -1,6 +1,7 @@
 ﻿import { SKILL_COOLDOWN_REDUCTION_CAP } from "../content/affixes";
 import { ENEMY_BY_ID } from "../content/enemies";
 import { HERO_SKILL_COMBAT } from "../content/balance";
+import { HERO_BY_ID } from "../content/heroes";
 import { ACTIVE_SKILL_BY_HERO } from "../content/skills";
 import { HERO_SKILL_BY_ID, type HeroSkillId } from "../content/heroSkills";
 import type { HeroId } from "./types";
@@ -87,12 +88,13 @@ export function tryCastSkill(
 ): BattleEvent[] {
   if (!source.alive || source.skillCooldownMs > 0 || !source.sourceId.startsWith("H")) return [];
   const heroId = source.sourceId as HeroId;
+  const pattern = HERO_BY_ID[heroId]?.skillPattern ?? heroId;
   const definition = ACTIVE_SKILL_BY_HERO[heroId];
   const combat = HERO_SKILL_COMBAT[heroId];
   if (!definition || !combat) return [];
   const enemies = enemiesOf(source, units);
   const allies = units.filter((unit) => unit.alive && unit.team === source.team);
-  if (heroId !== "H04" && enemies.length === 0) return [];
+  if (pattern !== "H04" && enemies.length === 0) return [];
   const events: BattleEvent[] = [
     { type: "skill:started", sourceId: source.id, skillId: definition.id },
   ];
@@ -101,7 +103,7 @@ export function tryCastSkill(
     (a, b) => Math.abs(a.x - source.x) - Math.abs(b.x - source.x),
   );
 
-  if (heroId === "H01") {
+  if (pattern === "H01") {
     const target = nearest[0]!;
     hurt(source, target, combat.hits[0]!.multiplier, random, events);
     applyStatus(target, {
@@ -112,14 +114,14 @@ export function tryCastSkill(
     });
     events.push({ type: "status:applied", targetId: target.id, kind: "stun" });
     targetIds.push(target.id);
-  } else if (heroId === "H02") {
+  } else if (pattern === "H02") {
     const target = nearest[0]!;
     for (const hit of combat.hits) {
       if (!target.alive) break;
       hurt(source, target, hit.multiplier, random, events);
     }
     targetIds.push(target.id);
-  } else if (heroId === "H03") {
+  } else if (pattern === "H03") {
     const target = nearest[0]!;
     hurt(source, target, combat.hits[0]!.multiplier, random, events);
     targetIds.push(target.id);
@@ -137,7 +139,7 @@ export function tryCastSkill(
       emberMax,
       Number(source.passiveFlags.emberStacks ?? 0) + 1,
     );
-  } else if (heroId === "H04") {
+  } else if (pattern === "H04") {
     const target = [...allies].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] ?? source;
     const healPower = 1 + Number(source.passiveFlags.gearHealPowerPct ?? 0);
     const shieldCap = Number(source.passiveFlags.kitHealShieldCap ?? 0.1);
@@ -149,7 +151,7 @@ export function tryCastSkill(
     const result = applyHealing(target, amount, true, shieldCap);
     events.push({ type: "heal", sourceId: source.id, targetId: target.id, amount: result.healed });
     targetIds.push(target.id);
-  } else if (heroId === "H05") {
+  } else if (pattern === "H05") {
     const target = nearest[0]!;
     hurt(source, target, combat.hits[0]!.multiplier, random, events);
     targetIds.push(target.id);
@@ -166,7 +168,7 @@ export function tryCastSkill(
         targetIds.push(third.id);
       }
     }
-  } else if (heroId === "H06") {
+  } else if (pattern === "H06") {
     const target = [...enemies].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]!;
     const threshold = combat.executeThreshold ?? 0.35;
     const multiplier =
@@ -176,7 +178,7 @@ export function tryCastSkill(
     hurt(source, target, multiplier, random, events);
     source.x = Math.min(source.x, target.x - engageRange(source));
     targetIds.push(target.id);
-  } else if (heroId === "H07") {
+  } else if (pattern === "H07") {
     const target = nearest[0]!;
     const radius = combat.aoeRadius ?? 90;
     for (const enemy of enemies.filter((unit) => Math.abs(unit.x - target.x) <= radius)) {
@@ -199,7 +201,7 @@ export function tryCastSkill(
       }
       targetIds.push(enemy.id);
     }
-  } else if (heroId === "H08") {
+  } else if (pattern === "H08") {
     const maxTargets = combat.chainMaxTargets ?? 3;
     const decay = combat.chainDecay ?? 0.75;
     const base = combat.hits[0]!.multiplier;

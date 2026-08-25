@@ -1,3 +1,5 @@
+import type { HeroId } from "../simulation/types";
+
 const stageBackgrounds = Object.fromEntries(
   Array.from({ length: 4 }, (_, chapterIndex) =>
     Array.from({ length: 12 }, (_, stageIndex) => {
@@ -24,16 +26,17 @@ const foregroundBackgrounds = {
   fg_4_sky_city: "/assets/backgrounds/foreground/fg_4_sky_city.webp",
 } as const;
 
+const heroCharacters = Object.fromEntries(
+  Array.from({ length: 40 }, (_, index) => {
+    const id = `H${String(index + 1).padStart(2, "0")}` as HeroId;
+    const file = `hero-h${String(index + 1).padStart(2, "0")}.webp`;
+    return [id, `/assets/characters/${file}`] as const;
+  }),
+) as Record<HeroId, string>;
+
 export const ASSET_MANIFEST = {
   characters: {
-    H01: "/assets/characters/hero-h01.webp",
-    H02: "/assets/characters/hero-h02.webp",
-    H03: "/assets/characters/hero-h03.webp",
-    H04: "/assets/characters/hero-h04.webp",
-    H05: "/assets/characters/hero-h05.webp",
-    H06: "/assets/characters/hero-h06.webp",
-    H07: "/assets/characters/hero-h07.webp",
-    H08: "/assets/characters/hero-h08.webp",
+    ...heroCharacters,
     E01: "/assets/characters/enemy-e01.png",
     E02: "/assets/characters/enemy-e02.png",
     E03: "/assets/characters/enemy-e03.png",

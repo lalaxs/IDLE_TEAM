@@ -11,7 +11,10 @@ const fixedRandom: RandomSource = {
   pick: <T>(values: readonly T[]) => values[0]!,
 };
 
-const heroIds: HeroId[] = ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08"];
+const heroIds: HeroId[] = [
+  "H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08",
+  "H09", "H12", "H18", "H22", "H25", "H29", "H36", "H40",
+];
 
 describe("hero skills", () => {
   it.each(heroIds)("%s resolves a distinct active skill and resets cooldown", (heroId) => {

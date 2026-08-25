@@ -19,11 +19,11 @@ import { SeededRandom } from "../../src/simulation/RandomSource";
 const LEGACY_SLOTS = ["main_weapon", "armor", "amulet"] as const;
 
 describe("approved content manifest", () => {
-  it("ships eight differentiated heroes and skills", () => {
-    expect(HERO_DEFINITIONS).toHaveLength(8);
-    expect(new Set(HERO_DEFINITIONS.map(({ id }) => id)).size).toBe(8);
-    expect(ACTIVE_SKILLS).toHaveLength(8);
-    expect(PASSIVE_SKILLS).toHaveLength(8);
+  it("ships forty differentiated heroes and skills", () => {
+    expect(HERO_DEFINITIONS).toHaveLength(40);
+    expect(new Set(HERO_DEFINITIONS.map(({ id }) => id)).size).toBe(40);
+    expect(ACTIVE_SKILLS).toHaveLength(40);
+    expect(PASSIVE_SKILLS).toHaveLength(40);
     expect(HERO_SKILLS).toHaveLength(8);
     expect(new Set(HERO_SKILLS.map(({ id }) => id)).size).toBe(8);
     expect(TALENT_NODES).toHaveLength(18);
@@ -33,6 +33,7 @@ describe("approved content manifest", () => {
       expect(PASSIVE_SKILLS.some(({ heroId }) => heroId === hero.id)).toBe(true);
       expect(["physical", "magic"]).toContain(hero.damageSchool);
       expect(["physical", "fire", "frost", "lightning", "dark", "holy"]).toContain(hero.damageElement);
+      expect(hero.skillPattern).toMatch(/^H0[1-8]$/);
     }
     expect(HERO_DEFINITIONS.find(({ id }) => id === "H03")?.damageElement).toBe("fire");
     expect(HERO_DEFINITIONS.find(({ id }) => id === "H04")?.damageElement).toBe("holy");
