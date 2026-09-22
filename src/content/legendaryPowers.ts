@@ -28,6 +28,7 @@ const LEGENDARY_TRAIT_BY_ITEM_ID: Readonly<Record<string, string>> = {
   accessory_frost_bell: "renewal",
   accessory_raven_badge: "precision",
   accessory_storm_drum: "focus",
+  offhand_frost_buckler: "aegis",
   weapon_frost_fang_saber: "frostbite",
   weapon_snow_pine_crossbow: "frostbite",
   weapon_aurora_grimoire: "frostbite",
@@ -66,14 +67,14 @@ const LEGENDARY_TRAIT_BY_ITEM_ID: Readonly<Record<string, string>> = {
   accessory_skycrystal_prism: "stormward",
 };
 
-const SLOT_FALLBACK: Record<string, string> = {
-  off_hand: "aegis",
-  helmet: "keen",
-  gloves: "fleet",
-  boots: "sturdy",
-  ring: "sanguine",
-  bracer: "warding",
-  earring: "insight",
+const SLOT_FALLBACK_POOLS: Record<string, readonly string[]> = {
+  off_hand: ["aegis", "deflect", "reprisal"],
+  helmet: ["keen", "foresight", "resolve"],
+  gloves: ["fleet", "combo", "leeching"],
+  boots: ["sturdy", "windstep", "elusive"],
+  ring: ["sanguine", "cruelty", "surge"],
+  bracer: ["warding", "parry", "barbed"],
+  earring: ["insight", "echoing", "vitality"],
 };
 
 const CHAPTER_WEAPON: Record<number, string> = {
@@ -107,13 +108,21 @@ function detectSlot(definitionId: string): string | null {
     return "armor";
   if (definitionId.startsWith("accessory_") || definitionId.startsWith("amulet_") || /_amulet$/.test(definitionId))
     return "amulet";
-  for (const slot of Object.keys(SLOT_FALLBACK)) {
+  for (const slot of Object.keys(SLOT_FALLBACK_POOLS)) {
     if (definitionId.startsWith(`${slot}_`) || definitionId.endsWith(`_${slot}`) || definitionId.includes(`_${slot}_`)) {
       return slot;
     }
   }
   if (definitionId.includes("off_hand") || definitionId.startsWith("offhand_")) return "off_hand";
   return null;
+}
+
+function fixedPoolIndex(definitionId: string, poolSize: number): number {
+  let value = 0;
+  for (let index = 0; index < definitionId.length; index += 1) {
+    value = (value + definitionId.charCodeAt(index) * (index + 1)) >>> 0;
+  }
+  return value % poolSize;
 }
 
 function detectChapter(definitionId: string): number {
@@ -129,7 +138,8 @@ function detectChapter(definitionId: string): number {
 function fallbackTrait(definitionId: string): string | null {
   const slot = detectSlot(definitionId);
   if (!slot) return null;
-  if (SLOT_FALLBACK[slot]) return SLOT_FALLBACK[slot]!;
+  const slotPool = SLOT_FALLBACK_POOLS[slot];
+  if (slotPool?.length) return slotPool[fixedPoolIndex(definitionId, slotPool.length)] ?? null;
   const chapter = detectChapter(definitionId);
   if (slot === "main_weapon") return CHAPTER_WEAPON[chapter] ?? "sharp";
   if (slot === "armor") return CHAPTER_ARMOR[chapter] ?? "tenacious";
@@ -137,25 +147,7 @@ function fallbackTrait(definitionId: string): string | null {
   return null;
 }
 
-/** Seed expanded-slot Ch1–4 ids into the fixed map at module load. */
-function expandLegacyMap(): Record<string, string> {
-  const map: Record<string, string> = { ...LEGENDARY_TRAIT_BY_ITEM_ID };
-  const prefixes: Array<[string, string]> = [
-    ["offhand_", "aegis"],
-    ["helmet_", "keen"],
-    ["gloves_", "fleet"],
-    ["boots_", "sturdy"],
-    ["ring_", "sanguine"],
-    ["bracer_", "warding"],
-    ["earring_", "insight"],
-  ];
-  // Known expanded ids are already listed historically; keep map for explicit Ch1–4 donors.
-  // Fallback covers anything missing.
-  void prefixes;
-  return map;
-}
-
-const RESOLVED_MAP = expandLegacyMap();
+const RESOLVED_MAP: Readonly<Record<string, string>> = { ...LEGENDARY_TRAIT_BY_ITEM_ID };
 
 export function getLegendaryTraitId(definitionId: string): string | null {
   return RESOLVED_MAP[definitionId] ?? fallbackTrait(definitionId);

@@ -1,0 +1,49 @@
+{
+  "version": "1.4",
+  "chapter": {
+    "id": 2,
+    "name": "霜风谷",
+    "stages": ["2-1", "2-2", "2-3", "2-4", "2-5", "2-6", "2-7", "2-8", "2-9", "2-10", "2-11", "2-12"]
+  },
+  "style_reference": "docs/art/generated/monsters/chapter-01/line-normalized/review/chapter-01-monsters-120px-check-v02.png",
+  "eye_rule": "眼睛主体使用平涂色块，禁止高光点、反射点、发光和用于制造亮泽的渐变",
+  "facing_rule": "原始透明图统一朝画面右侧；游戏运行时统一水平翻转，最终战斗画面朝左并面向我方",
+  "regions": [
+    {
+      "id": "frostwind_snowfield",
+      "name": "冻土前哨",
+      "palette": ["暖灰冻土", "灰褐", "米白薄雪", "浅冰蓝", "暗灰蓝", "深橄榄棕描边"],
+      "monsters": [
+        { "slot": "C02-R01-N1", "runtime_id": "E13", "type": "normal", "name": "雪耳兔", "slug": "snowear-hare", "role": "均衡近战", "visual_anchors": ["后折长耳", "单块米白胸腹"], "filename": "enemy-e13.png" },
+        { "slot": "C02-R01-N2", "runtime_id": "E14", "type": "normal", "name": "冰腹鼬", "slug": "icebelly-weasel", "role": "快速突进", "visual_anchors": ["低伏长条躯干", "浅冰蓝腹带"], "filename": "enemy-e14.png" },
+        { "slot": "C02-R01-N3", "runtime_id": "E15", "type": "normal", "name": "冻壳蜗", "slug": "frostshell-snail", "role": "减速与高防", "visual_anchors": ["单块椭圆冻壳", "两根短钝触角"], "filename": "enemy-e15.png" },
+        { "slot": "C02-R01-E1", "runtime_id": "E16", "type": "elite", "name": "霜角牦", "slug": "frosthorn-yak", "role": "击退与周期减伤", "visual_anchors": ["一对横展钝角", "整块厚雪颈圈", "宽蹄"], "filename": "enemy-e16.png" },
+        { "slot": "C02-R01-B1", "runtime_id": "B16", "type": "boss", "name": "雪岭眠熊", "slug": "snowridge-slumber-bear", "role": "雪丘扑压与厚雪卸力", "visual_anchors": ["横向圆丘熊体", "单块雪坡披背", "岩丘形前掌", "低垂大头"], "filename": "enemy-b16.png" }
+      ]
+    },
+    {
+      "id": "frostwind_pinewood",
+      "name": "雪松幽林",
+      "palette": ["深松绿", "灰蓝针叶", "湿木棕", "雾灰", "米白积雪", "深橄榄棕描边"],
+      "monsters": [
+        { "slot": "C02-R02-N1", "runtime_id": "E17", "type": "normal", "name": "松果鼠", "slug": "pinecone-squirrel", "role": "基础远程", "visual_anchors": ["单枚松果形大尾", "两只圆耳"], "filename": "enemy-e17.png" },
+        { "slot": "C02-R02-N2", "runtime_id": "E18", "type": "normal", "name": "雾翅蛾", "slug": "mistwing-moth", "role": "快速游击", "visual_anchors": ["一对宽短雾翼", "叶片形短触角"], "filename": "enemy-e18.png" },
+        { "slot": "C02-R02-N3", "runtime_id": "E19", "type": "normal", "name": "冰芽鹿", "slug": "icebud-deer", "role": "霜缓与支援", "visual_anchors": ["两枚圆芽形短角", "单块浅色颈腹"], "filename": "enemy-e19.png" },
+        { "slot": "C02-R02-E1", "runtime_id": "E20", "type": "elite", "name": "霜丝蛛", "slug": "frost-silk-spider", "role": "束缚与自我减伤", "visual_anchors": ["松果形分片大腹", "粗短足", "宽霜丝护带"], "filename": "enemy-e20.png" },
+        { "slot": "C02-R02-B1", "runtime_id": "B20", "type": "boss", "name": "霜鬃猞猁", "slug": "frostmane-lynx", "role": "跃扑连击与低血加速", "visual_anchors": ["低伏宽身猫科", "两只短耳簇", "整块三角雪鬃", "宽前掌"], "filename": "enemy-b20.png" }
+      ]
+    },
+    {
+      "id": "frostwind_aurora_ruins",
+      "name": "极光遗迹",
+      "palette": ["暗蓝灰", "冷灰旧石", "灰青紫", "低饱和极光青", "米白冰壳", "深橄榄棕描边"],
+      "monsters": [
+        { "slot": "C02-R03-N1", "runtime_id": "E21", "type": "normal", "name": "霜环雪獾", "slug": "frostring-snow-badger", "role": "均衡前排", "visual_anchors": ["矮宽雪獾体", "单个残缺霜石环", "短腿贴地"], "filename": "enemy-e21.png" },
+        { "slot": "C02-R03-N2", "runtime_id": "E22", "type": "normal", "name": "辉带岩蜥", "slug": "aurora-band-rock-lizard", "role": "快速范围攻击", "visual_anchors": ["钝圆陆生蜥头", "两块宽钝石板", "单条灰青背带"], "filename": "enemy-e22.png" },
+        { "slot": "C02-R03-N3", "runtime_id": "E23", "type": "normal", "name": "冻纹龟", "slug": "frostmark-turtle", "role": "护卫与减伤", "visual_anchors": ["椭圆暗冰壳", "单圈宽霜纹"], "filename": "enemy-e23.png" },
+        { "slot": "C02-R03-E1", "runtime_id": "E24", "type": "elite", "name": "冰脊豪猪", "slug": "iceback-porcupine", "role": "反伤与周期减伤", "visual_anchors": ["五片宽钝背脊", "圆盾形侧身", "短铲鼻"], "filename": "enemy-e24.png" },
+        { "slot": "C02-R03-B1", "runtime_id": "B24", "type": "boss", "name": "极光冠鸮", "slug": "aurora-crowned-owl", "role": "极光压羽与低血回响", "visual_anchors": ["巨大圆润鸮体", "朝右短喙", "残缺石环头冠", "单条灰青翼带"], "filename": "enemy-b24.png" }
+      ]
+    }
+  ]
+}

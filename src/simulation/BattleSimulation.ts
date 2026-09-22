@@ -1,40 +1,91 @@
-import { ENEMY_BY_ID } from "../content/enemies";
+import { ENEMY_BY_ID, resolveEnemyDamageElement } from "../content/enemies";
 import { HERO_BY_ID } from "../content/heroes";
-import { STAGE_DEFINITIONS } from "../content/stages";
 import { ACTIVE_SKILL_BY_HERO } from "../content/skills";
-import { HERO_SKILL_BY_ID } from "../content/heroSkills";
-import { getHeroStats, type HeroStatGrowth } from "../progression/HeroProgression";
-import { SKILL_COOLDOWN_REDUCTION_CAP, DODGE_CHANCE_CAP, BLOCK_CHANCE_CAP } from "../content/affixes";
-import { calculateDamage, applyHealing, resolveHit, schoolDamageMultiplier, elementDamageMultiplier, outgoingElementMultiplier } from "./CombatSystem";
+import { STAGE_DEFINITIONS } from "../content/stages";
+import { HERO_MAX_RAGE } from "../content/rage";
+import { DODGE_CHANCE_CAP, BLOCK_CHANCE_CAP } from "../content/affixes";
+import {
+  DIFFICULTY_BY_ID,
+  difficultyPowerStage,
+  type GameDifficulty,
+} from "../content/difficulties";
+import { enemyAtkMultiplier, enemyDefMultiplier, enemyHpMultiplier } from "../content/balance";
+import { applyHealing, damageEvents, gearDamageMultiplier, outgoingElementMultiplier, resolveDamage } from "./CombatSystem";
 import {
   advanceMovement,
   engageRange,
-  ENEMY_ENTRY_SPEED,
   ENEMY_ENTRY_STAGGER_MS,
   enemyEntryStartX,
+  formationLane,
   HERO_ENTRY_SPEED,
   HERO_ENTRY_STAGGER_MS,
   heroEntryStartX,
   heroFormationOffset,
+  laneOffsetY,
+  movementStep,
 } from "./MovementSystem";
 import { SeededRandom } from "./RandomSource";
-import { tryCastReadySkill } from "./SkillSystem";
+import { hasEnemyInCastRange, tryCastReadySkill } from "./SkillSystem";
+import { afterTalentBasicAttack } from "./TalentCombatSystem";
+import {
+  advanceSkillPreparation,
+  cancelSkillPreparation,
+  clampCastSpeedPct,
+  gainRageFromBasicAttack,
+  grantRage,
+} from "./RageSystem";
+import { addPeriodicEffect, tickPeriodicEffects } from "./PeriodicEffectSystem";
+import {
+  afterSpecializationBasicAttack,
+  onPeriodicEffectEvents,
+  specializationBasicAttackModifiers,
+  selectSpecializationTarget,
+  shouldCastSpecialization,
+  specializationCastTime,
+  specializationReactions,
+  tickSpecializationPassives,
+} from "./SpecializationSkillSystem";
+import {
+  afterSharedHeroPassiveBasicAttack,
+  afterSharedHeroPassiveDamage,
+  tickSharedHeroPassive,
+} from "./SharedHeroPassiveSystem";
+import { HERO_SKILL_BY_ID } from "../content/heroSkills";
 import { advanceStatuses, applyStatus, getStatusMagnitude, isStunned } from "./StatusSystem";
-import { selectTarget } from "./TargetingSystem";
+import { resolveThorns } from "./ThornsSystem";
+import { isTankUnit, resolveMeleeFrontTarget, selectTarget } from "./TargetingSystem";
 import { createEnemyUnits, trashQuotaForStage } from "./WaveSystem";
+import {
+  advanceEnemyBehavior,
+  activeEnemyAbilityFor,
+  applyDifficultySignatureMechanic,
+  applyEnemyStatusOnly,
+  afterEnemyBasicHit,
+  completeEnemyActive,
+  enemyBasicAttackMultiplier,
+  enemyDeathBurst,
+  initialEnemySkillTrigger,
+  selectEnemyBasicTarget,
+} from "./EnemyBehaviorSystem";
 import type { BattleEvent, BattleSnapshot, HeroId, UnitState } from "./types";
 
 export interface BattleSimulationOptions {
   stage: number;
+  difficulty?: GameDifficulty;
   party: readonly (HeroId | null)[];
-  heroLevels: Partial<Record<HeroId, number>>;
-  heroGrowth?: Partial<Record<HeroId, HeroStatGrowth>>;
+  heroStats: Partial<Record<HeroId, HeroCombatStats>>;
   heroBonuses?: Partial<Record<HeroId, HeroBattleBonus>>;
   heroStartX?: Partial<Record<HeroId, number>>;
   startWithTravel?: boolean;
   seed: number;
   /** Extra boss-meter fill rate (0.01 = +1%). */
   bossProgressBonus?: number;
+}
+
+export interface HeroCombatStats {
+  maxHp: number;
+  attack: number;
+  defense: number;
 }
 
 export interface HeroBattleBonus {
@@ -45,6 +96,7 @@ export interface HeroBattleBonus {
   /** Multiplier on final defense (TBH Armor %). */
   defensePct?: number;
   attackSpeedPct?: number;
+  castSpeedPct?: number;
   critChance?: number;
   /** Extra crit damage percent points on top of base 150%. */
   critDamagePct?: number;
@@ -96,28 +148,104 @@ export interface HeroBattleBonus {
   allResistPct?: number;
   /** Multiplier on outgoing heal amounts (skills / potions). */
   healPowerPct?: number;
-  skillCooldownPct?: number;
+  rageGainPct?: number;
   skillDamagePct?: number;
+  /** Star-rank multiplier for damage, healing, shields, and positive buff magnitudes. */
+  skillEffectPct?: number;
   executeDamagePct?: number;
   attackPct?: number;
   hpRegenMaxHpPct?: number;
   waveStartShieldPct?: number;
-  waveStartSkillCdrPct?: number;
+  waveStartRage?: number;
   chosenSkillId?: string;
-  ultimateUnlocked?: boolean;
+  augmentationTargetId?: HeroId | null;
   awakeningUnlocked?: boolean;
   guardianShieldPct?: number;
   thornsPct?: number;
   renewalPct?: number;
   frostbiteChance?: number;
   snowguardShieldPct?: number;
-  frostfocusCooldownPct?: number;
+  frostfocusInitialRage?: number;
   sandscarChance?: number;
   mirageGuardPct?: number;
   tailwindPct?: number;
   thunderbrandPct?: number;
   cloudveilShieldPct?: number;
   stormwardShieldPct?: number;
+  talentBasicDamagePct?: number;
+  talentBasicRage?: number;
+  talentBasicProc?: string;
+  talentBasicProcInterval?: number;
+  talentBasicProcValue?: number;
+  talentBasicProcDurationMs?: number;
+  talentActiveDamagePct?: number;
+  talentActiveHealPct?: number;
+  talentActiveProc?: string;
+  talentActiveProcValue?: number;
+  talentActiveProcDurationMs?: number;
+  talentSpecialization?: number;
+}
+
+export function createEnemySummonUnit(
+  event: Extract<BattleEvent, { type: "enemy:summoned" }>,
+  parent: UnitState,
+  stage: number,
+  enemyCount: number,
+  difficulty: GameDifficulty = "easy",
+): UnitState | null {
+  const definition = ENEMY_BY_ID[event.sourceEnemyId];
+  if (!definition) return null;
+  const id = `${parent.id}:${event.summonId}`;
+  const difficultyDefinition = DIFFICULTY_BY_ID[difficulty];
+  const powerStage = difficultyPowerStage(stage, difficulty);
+  const maxHp = Math.max(1, Math.round(
+    definition.maxHp * enemyHpMultiplier(powerStage) * difficultyDefinition.enemyHpMultiplier * event.hpRatio,
+  ));
+  return {
+    id,
+    team: "enemies",
+    sourceId: event.sourceEnemyId,
+    name: definition.name,
+    x: parent.x + 46,
+    y: laneOffsetY(id, enemyCount, "enemies"),
+    hp: maxHp,
+    maxHp,
+    rage: 0,
+    maxRage: 0,
+    attack: Math.max(1, Math.round(
+      definition.attack * enemyAtkMultiplier(powerStage) * difficultyDefinition.enemyAttackMultiplier * event.attackRatio,
+    )),
+    defense: Math.round(
+      definition.defense * enemyDefMultiplier(powerStage) * difficultyDefinition.enemyDefenseMultiplier,
+    ),
+    damageElement: resolveEnemyDamageElement(event.sourceEnemyId, stage),
+    critChance: 0.05,
+    attackMode: definition.attackMode,
+    attackRange: definition.attackRange,
+    moveSpeed: definition.moveSpeed,
+    attackIntervalMs: definition.attackIntervalMs,
+    castSpeedPct: 0,
+    attackCooldownMs: 0,
+    skillTriggerMs: initialEnemySkillTrigger(event.sourceEnemyId),
+    skillPrepareMs: null,
+    skillCastDurationMs: null,
+    skillCastId: null,
+    skillCastSequence: 0,
+    skillTargetIds: [],
+    targetId: null,
+    shield: 0,
+    statuses: [],
+    periodicEffects: [],
+    alive: true,
+    basicAttackCount: 0,
+    skillCastCount: 0,
+    passiveFlags: {
+      holdX: parent.x + 46,
+      entryDone: true,
+      formationLane: formationLane(enemyCount, "enemies"),
+    },
+    countsForBossProgress: false,
+  };
 }
 
 const FIXED_STEP = 50;
@@ -128,6 +256,7 @@ const NEXT_ENCOUNTER_GAP = 320;
 
 export class BattleSimulation {
   private stage: number;
+  private readonly difficulty: GameDifficulty;
   /** Encounter index for pack seeding — not a player-facing “wave number”. */
   private wave = 1;
   private trashKills = 0;
@@ -142,21 +271,22 @@ export class BattleSimulation {
   private accumulator = 0;
   private units: UnitState[];
   private events: BattleEvent[] = [];
+  private reportedDeaths = new Set<string>();
+  private snapshotCache: BattleSnapshot | null = null;
   private readonly random: SeededRandom;
   private readonly seed: number;
-  private heroGrowth: Partial<Record<HeroId, HeroStatGrowth>>;
 
   constructor(options: BattleSimulationOptions) {
     this.stage = options.stage;
+    this.difficulty = options.difficulty ?? "easy";
     this.seed = options.seed;
-    this.heroGrowth = options.heroGrowth ?? {};
     this.random = new SeededRandom(options.seed);
     this.baseTrashQuota = Math.max(1, trashQuotaForStage(options.stage, options.seed));
     const progressBonus = Math.max(0, options.bossProgressBonus ?? 0);
     this.trashQuota = Math.max(1, Math.ceil(this.baseTrashQuota / (1 + progressBonus)));
     const heroes = this.createHeroUnits(
       options.party,
-      options.heroLevels,
+      options.heroStats,
       options.heroBonuses ?? {},
       options.heroStartX ?? {},
     );
@@ -169,16 +299,26 @@ export class BattleSimulation {
   }
 
   getSnapshot(): BattleSnapshot {
-    return {
+    if (this.snapshotCache) return this.snapshotCache;
+    this.snapshotCache = {
       stage: this.stage,
+      difficulty: this.difficulty,
       wave: this.wave,
       state: this.state,
       elapsedMs: this.elapsedMs,
-      units: this.units.map((unit) => ({ ...unit, statuses: unit.statuses.map((status) => ({ ...status })) })),
+      units: this.units.map((unit) => ({
+        ...unit,
+        skillTargetIds: [...unit.skillTargetIds],
+        statuses: unit.statuses.map((status) => ({ ...status })),
+        periodicEffects: unit.periodicEffects.map((effect) => ({ ...effect })),
+        passiveFlags: { ...unit.passiveFlags },
+        specialization: unit.specialization ? structuredClone(unit.specialization) : undefined,
+      })),
       progress: Math.min(1, this.trashKills / this.trashQuota),
       bossActive: this.bossActive,
       seed: this.seed,
     };
+    return this.snapshotCache;
   }
 
   private get bossProgress(): number {
@@ -195,6 +335,7 @@ export class BattleSimulation {
       steps += 1;
     }
     if (steps === 5) this.accumulator = 0;
+    if (steps > 0) this.snapshotCache = null;
   }
 
   drainEvents(): BattleEvent[] {
@@ -202,53 +343,59 @@ export class BattleSimulation {
   }
 
   debugDefeatEnemies(): void {
+    const events: BattleEvent[] = [];
     for (const enemy of this.units.filter(({ team, alive }) => team === "enemies" && alive)) {
       enemy.hp = 0;
       enemy.alive = false;
-      this.events.push({ type: "unit:died", unitId: enemy.id });
-      this.onEnemyKilled(enemy);
+      events.push({ type: "unit:died", unitId: enemy.id });
     }
+    this.pushCombatEvents(events);
+    this.snapshotCache = null;
   }
 
   debugDefeatHeroes(): void {
+    const events: BattleEvent[] = [];
     for (const hero of this.units.filter(({ team, alive }) => team === "heroes" && alive)) {
       hero.hp = 0;
       hero.alive = false;
-      this.events.push({ type: "unit:died", unitId: hero.id });
+      events.push({ type: "unit:died", unitId: hero.id });
     }
+    this.pushCombatEvents(events);
+    this.snapshotCache = null;
   }
 
   setBossProgressBonus(bonus: number): void {
     this.trashQuota = Math.max(1, Math.ceil(this.baseTrashQuota / (1 + Math.max(0, bonus))));
+    this.snapshotCache = null;
   }
 
   refreshHeroStats(
-    levels: Partial<Record<HeroId, number>>,
+    stats: Partial<Record<HeroId, HeroCombatStats>>,
     bonuses: Partial<Record<HeroId, HeroBattleBonus>>,
-    growth?: Partial<Record<HeroId, HeroStatGrowth>>,
   ): void {
-    if (growth) this.heroGrowth = growth;
     for (const unit of this.units.filter(({ team, alive }) => team === "heroes" && alive)) {
       const heroId = unit.sourceId as HeroId;
       const definition = HERO_BY_ID[heroId];
-      const levelStats = getHeroStats(heroId, levels[heroId] ?? 1, this.heroGrowth[heroId]);
+      const combatStats = stats[heroId] ?? definition;
       const bonus = bonuses[heroId] ?? {};
       const hpRatio = unit.hp / unit.maxHp;
       const cooldownRatio = unit.attackCooldownMs / Math.max(1, unit.attackIntervalMs);
-      const maxHp = Math.round((levelStats.maxHp + (bonus.maxHp ?? 0)) * (1 + (bonus.maxHpPct ?? 0)));
+      const maxHp = Math.round((combatStats.maxHp + (bonus.maxHp ?? 0)) * (1 + (bonus.maxHpPct ?? 0)));
       const interval = Math.round(definition.attackIntervalMs / (1 + (bonus.attackSpeedPct ?? 0) / 100));
       unit.maxHp = maxHp;
       unit.hp = Math.max(1, Math.round(maxHp * hpRatio));
-      unit.attack = Math.round((levelStats.attack + (bonus.attack ?? 0)) * (1 + (bonus.attackPct ?? 0)));
+      unit.attack = Math.round((combatStats.attack + (bonus.attack ?? 0)) * (1 + (bonus.attackPct ?? 0)));
       unit.defense = Math.round(
-        (levelStats.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0)),
+        (combatStats.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0)),
       );
       unit.critChance = 0.05 + (bonus.critChance ?? 0);
       unit.attackIntervalMs = interval;
+      unit.castSpeedPct = clampCastSpeedPct(bonus.castSpeedPct ?? 0);
       unit.attackCooldownMs = Math.max(0, cooldownRatio * interval);
       unit.moveSpeed = definition.moveSpeed * (1 + (bonus.moveSpeedPct ?? 0) / 100);
       this.applyGearFlags(unit, bonus);
     }
+    this.snapshotCache = null;
   }
 
   private tick(deltaMs: number): void {
@@ -266,6 +413,7 @@ export class BattleSimulation {
       return;
     }
     if (aliveEnemies.length === 0) {
+      this.cancelPendingHeroSkills();
       this.advanceWave();
       return;
     }
@@ -291,35 +439,52 @@ export class BattleSimulation {
     this.resolveActions();
   }
 
-  /** Statuses, cooldowns, and passive procs shared by intro and open combat. */
+  /** Statuses, attack timing, and passive procs shared by intro and open combat. */
   private tickCombat(deltaMs: number): void {
     for (const unit of this.units) {
       advanceStatuses(unit, deltaMs);
+      const periodicEvents = tickPeriodicEffects(unit, deltaMs, this.random, this.units);
+      onPeriodicEffectEvents(periodicEvents, this.units);
+      this.pushCombatEvents(periodicEvents);
       if (!unit.alive) continue;
+      this.pushCombatEvents(tickSpecializationPassives(unit, this.units, deltaMs, this.random));
+      if (!unit.alive) continue;
+      tickSharedHeroPassive(unit, deltaMs);
       const haste = getStatusMagnitude(unit, "haste");
       const slow = getStatusMagnitude(unit, "slow");
       const cooldownRate = Math.max(0.2, 1 + haste - slow);
       unit.attackCooldownMs -= deltaMs * cooldownRate;
-      unit.skillCooldownMs -= deltaMs;
-      unit.ultimateCooldownMs -= deltaMs;
+      if (unit.team === "enemies") {
+        this.pushCombatEvents(advanceEnemyBehavior(unit, this.units, deltaMs, this.difficulty));
+      } else {
+        const definition = ACTIVE_SKILL_BY_HERO[unit.sourceId as HeroId];
+        const hasLivingEnemy = this.units.some(
+          (candidate) => candidate.alive && candidate.team !== unit.team,
+        );
+        const transition = advanceSkillPreparation(
+          unit,
+          deltaMs,
+          Boolean(definition)
+            && !isStunned(unit)
+            && hasLivingEnemy
+            && (unit.skillPrepareMs !== null || shouldCastSpecialization(unit, this.units))
+            && (unit.skillPrepareMs !== null || hasEnemyInCastRange(unit, this.units)),
+          definition ? specializationCastTime(unit, definition.castTimeMs) : undefined,
+        );
+        if (transition && definition) {
+          this.events.push({
+            type: transition.type === "started" ? "skill:started" : "skill:cancelled",
+            castId: transition.castId,
+            sourceId: unit.id,
+            skillId: definition.id,
+          });
+        }
+      }
       const hpRegen =
         Number(unit.passiveFlags.gearHpRegenPerSec ?? 0) +
         unit.maxHp * Number(unit.passiveFlags.kitHpRegenMaxHpPct ?? 0);
       if (unit.team === "heroes" && hpRegen > 0 && unit.hp < unit.maxHp) {
         applyHealing(unit, (hpRegen * deltaMs) / 1000, false);
-      }
-      const holdLine = Number(unit.passiveFlags.kitHoldLine ?? 0.4);
-      const holdPattern = HERO_BY_ID[unit.sourceId as HeroId]?.skillPattern === "H01";
-      if (holdPattern && unit.hp / unit.maxHp < holdLine && !unit.passiveFlags.hold) {
-        applyStatus(unit, { kind: "damageReduction", magnitude: 0.15, remainingMs: 999_999, sourceId: unit.id });
-        unit.passiveFlags.hold = true;
-      }
-      const bloodLine = Number(unit.passiveFlags.kitBloodLine ?? 0.45);
-      const bloodHaste = Number(unit.passiveFlags.kitBloodHaste ?? 0.25);
-      const bloodPattern = HERO_BY_ID[unit.sourceId as HeroId]?.skillPattern === "H02";
-      if (bloodPattern && unit.hp / unit.maxHp < bloodLine && !unit.passiveFlags.blood) {
-        applyStatus(unit, { kind: "haste", magnitude: bloodHaste, remainingMs: 999_999, sourceId: unit.id });
-        unit.passiveFlags.blood = true;
       }
       const mirageGuard = Number(unit.passiveFlags.gearMirageGuard ?? 0);
       if (
@@ -330,6 +495,7 @@ export class BattleSimulation {
       ) {
         applyStatus(unit, {
           kind: "mirageGuard",
+          effectId: "gear-mirage-guard",
           magnitude: mirageGuard,
           remainingMs: 3000,
           sourceId: `${unit.id}:mirageguard`,
@@ -346,33 +512,88 @@ export class BattleSimulation {
       if (unit.team === "heroes") {
         const skillEvents = tryCastReadySkill(unit, this.units, this.random);
         this.pushCombatEvents(skillEvents);
-        // Only skip the auto-attack when a skill actually resolved this tick.
         if (skillEvents.some((event) => event.type === "skill:resolved")) continue;
-      }
-      if (ENEMY_BY_ID[unit.sourceId as keyof typeof ENEMY_BY_ID]?.kind === "boss" && unit.skillCooldownMs <= 0) {
-        this.castBossSkill(unit);
-        continue;
+        // Preparation owns the hero's action until it resolves or is cancelled.
+        if (unit.skillPrepareMs !== null || unit.specialization?.channel) continue;
+      } else {
+        if (unit.skillPrepareMs === 0 && this.resolveEnemyActive(unit)) continue;
+        if (unit.skillPrepareMs !== null) continue;
       }
       if (unit.attackCooldownMs <= 0) this.basicAttack(unit);
     }
   }
 
   private pushCombatEvents(events: readonly BattleEvent[]): void {
+    events = [...events, ...specializationReactions(events, this.units, this.random)];
+    const deaths: Extract<BattleEvent, { type: "unit:died" }>[] = [];
     for (const event of events) {
-      this.events.push(event);
       if (event.type === "unit:died") {
-        const fallen = this.units.find(({ id }) => id === event.unitId);
-        if (fallen) this.onEnemyKilled(fallen);
+        deaths.push(event);
+      } else if (event.type === "enemy:summoned") {
+        this.materializeEnemySummon(event);
+        this.events.push(event);
+      } else {
+        this.events.push(event);
       }
+    }
+    for (const event of deaths) {
+      if (this.reportedDeaths.has(event.unitId)) continue;
+      this.reportedDeaths.add(event.unitId);
+      this.events.push(event);
+      const fallen = this.units.find(({ id }) => id === event.unitId);
+      if (fallen) this.onEnemyKilled(fallen, event);
+    }
+  }
+
+  private materializeEnemySummon(event: Extract<BattleEvent, { type: "enemy:summoned" }>): void {
+    const parent = this.units.find((unit) => unit.id === event.sourceId && unit.alive);
+    if (!parent) return;
+    const id = `${parent.id}:${event.summonId}`;
+    if (this.units.some((unit) => unit.id === id)) return;
+    const summon = createEnemySummonUnit(
+      event,
+      parent,
+      this.stage,
+      this.units.filter((unit) => unit.team === "enemies").length,
+      this.difficulty,
+    );
+    if (!summon) return;
+    this.units.push(summon);
+  }
+
+  private cancelPendingHeroSkills(): void {
+    for (const unit of this.units) {
+      if (unit.team !== "heroes") continue;
+      const transition = cancelSkillPreparation(unit);
+      const definition = ACTIVE_SKILL_BY_HERO[unit.sourceId as HeroId];
+      if (!transition || !definition) continue;
+      this.events.push({
+        type: "skill:cancelled",
+        castId: transition.castId,
+        sourceId: unit.id,
+        skillId: definition.id,
+      });
     }
   }
 
   /** Trash kills fill the meter that eventually summons the boss. */
-  private onEnemyKilled(enemy: UnitState): void {
+  private onEnemyKilled(
+    enemy: UnitState,
+    death: Extract<BattleEvent, { type: "unit:died" }>,
+  ): void {
     if (enemy.team !== "enemies") return;
+    this.pushCombatEvents(enemyDeathBurst(enemy, this.units, this.random));
     const kind = ENEMY_BY_ID[enemy.sourceId as keyof typeof ENEMY_BY_ID]?.kind ?? "normal";
-    this.events.push({ type: "enemy:killed", kind });
-    if (this.bossActive || ENEMY_BY_ID[enemy.sourceId as keyof typeof ENEMY_BY_ID]?.kind === "boss") return;
+    this.events.push({
+      type: "enemy:killed",
+      unitId: enemy.id,
+      worldX: enemy.x,
+      worldY: enemy.y,
+      kind,
+      attackId: death.attackId,
+      skillCastId: death.skillCastId,
+    });
+    if (enemy.countsForBossProgress === false || this.bossActive || ENEMY_BY_ID[enemy.sourceId as keyof typeof ENEMY_BY_ID]?.kind === "boss") return;
     if (this.trashKills >= this.trashQuota) return;
     this.trashKills += 1;
     this.events.push({ type: "boss:progress", progress: this.bossProgress });
@@ -380,188 +601,367 @@ export class BattleSimulation {
 
   private basicAttack(source: UnitState): void {
     const heroDef = source.team === "heroes" ? HERO_BY_ID[source.sourceId as HeroId] : undefined;
-    const strategy =
-      heroDef?.targetStrategy ??
-      (source.team === "enemies" ? "frontmostEnemy" : "nearestEnemy");
-    const target = selectTarget(source, this.units, strategy);
-    if (!target || Math.abs(target.x - source.x) > engageRange(source) + 4) return;
-    let emberStacks = Number(source.passiveFlags.emberStacks ?? 0);
-    if (source.passiveFlags.ember) emberStacks = Math.max(emberStacks, 1);
-    let multiplier = emberStacks > 0 ? 1.35 : 1;
-    multiplier *= 1 + Number(source.passiveFlags.gearDamagePct ?? 0);
-    multiplier *= schoolDamageMultiplier(source);
-    multiplier *= elementDamageMultiplier(source);
+    const preferredTarget = source.team === "enemies"
+      ? selectEnemyBasicTarget(source, this.units)
+      : selectSpecializationTarget(source, this.units)
+        ?? selectTarget(source, this.units, heroDef?.targetStrategy ?? "nearestEnemy");
+    let target = resolveMeleeFrontTarget(source, preferredTarget, this.units);
+    if (
+      source.attackMode === "melee"
+      && !(source.team === "enemies" && target && isTankUnit(target))
+      && (!target || Math.abs(target.x - source.x) > engageRange(source, target) + 4)
+    ) {
+      target = this.units
+        .filter((candidate) =>
+          candidate.alive
+          && candidate.team !== source.team
+          && Math.abs(candidate.x - source.x) <= engageRange(source, candidate) + 4,
+        )
+        .sort(
+          (left, right) =>
+            Math.abs(left.x - source.x) - Math.abs(right.x - source.x)
+            || Math.abs(left.y - source.y) - Math.abs(right.y - source.y)
+            || left.id.localeCompare(right.id),
+        )[0] ?? target;
+    }
+    source.targetId = target?.id ?? null;
+    if (!target || Math.abs(target.x - source.x) > engageRange(source, target) + 4) return;
+    let multiplier = 1;
+    if (source.team === "enemies") multiplier *= enemyBasicAttackMultiplier(source);
+    const specializationModifiers = specializationBasicAttackModifiers(source, target);
+    multiplier *= specializationModifiers.damageMultiplier;
+    multiplier *= gearDamageMultiplier(source);
     if (source.team === "heroes") {
       multiplier *= 1 + Number(source.passiveFlags.gearPrimaryAttackPct ?? 0);
+      multiplier *= 1 + Number(source.passiveFlags.talentBasicDamagePct ?? 0);
     }
     if (target.hp / target.maxHp < 0.35) {
       multiplier += Number(source.passiveFlags.gearExecute ?? 0);
+    }
+    const meteorPassive = HERO_SKILL_BY_ID.meteor.passive;
+    if (
+      source.chosenSkillId === "meteor"
+      && target.hp / target.maxHp > (meteorPassive.highHpThreshold ?? 0.7)
+    ) {
+      multiplier *= 1 + (meteorPassive.highHpDamageBonus ?? 0.15);
+    }
+    const executePassive = HERO_SKILL_BY_ID["execute-flurry"].passive;
+    if (
+      source.chosenSkillId === "execute-flurry"
+      && target.hp / target.maxHp < (executePassive.executeThreshold ?? 0.35)
+    ) {
+      multiplier *= 1 + (executePassive.executeDamageBonus ?? 0.2);
     }
     const enemyKind = ENEMY_BY_ID[target.sourceId as keyof typeof ENEMY_BY_ID]?.kind;
     if (enemyKind === "elite" || enemyKind === "boss") {
       multiplier *= 1 + Number(source.passiveFlags.gearEliteDamage ?? 0);
     }
-    source.passiveFlags.ember = false;
-    if (emberStacks > 0) source.passiveFlags.emberStacks = emberStacks - 1;
     const critMultiplier = 1.5 + Number(source.passiveFlags.gearCritDamagePct ?? 0) / 100;
-    const roll = calculateDamage(
-      source.attack * multiplier * outgoingElementMultiplier(source),
-      target.defense,
-      source.critChance,
-      this.random,
-      getStatusMagnitude(target, "armorBreak"),
-      critMultiplier,
-    );
     this.prepareGuardian(target);
     source.basicAttackCount += 1;
+    const attackId = `${source.id}:basic:${source.basicAttackCount}`;
     source.attackCooldownMs = source.attackIntervalMs;
     this.events.push({
       type: "attack",
+      attackId,
       sourceId: source.id,
       targetId: target.id,
-      ranged: source.attackRange > 100,
+      attackMode: source.attackMode,
+      element: source.damageElement,
     });
-    const hit = resolveHit(target, roll.damage, this.random, source.damageElement);
+    const delivery = source.attackMode === "melee" ? "contact" : "projectile";
+    const hit = resolveDamage({
+      attackId,
+      sourceId: source.id,
+      target,
+      context: { sourceKind: "basic", delivery },
+      element: source.damageElement,
+      baseDamage: source.attack * multiplier * outgoingElementMultiplier(source),
+      profile: "standard",
+      critChance: source.critChance + specializationModifiers.critChanceBonus,
+      critMultiplier,
+      defenseReduction: getStatusMagnitude(target, "armorBreak"),
+    }, this.random);
+    const combatEvents = damageEvents(hit, false);
+    if (hit.killed) combatEvents.push({ type: "unit:died", unitId: target.id, attackId });
     if (hit.outcome === "hit") {
-      this.events.push({
-        type: "damage",
-        sourceId: source.id,
-        targetId: target.id,
-        amount: hit.amount,
-        critical: roll.critical && !hit.blocked,
-        element: source.damageElement,
-      });
+      if (source.team === "heroes") gainRageFromBasicAttack(source);
+      afterSharedHeroPassiveDamage(
+        source,
+        target,
+        hit.critical,
+        combatEvents,
+      );
       const lifeOnHit = Number(source.passiveFlags.gearLifeOnHit ?? 0);
       if (source.team === "heroes" && lifeOnHit > 0 && source.alive) {
-        applyHealing(source, lifeOnHit, false);
+        const healed = applyHealing(source, lifeOnHit, false).healed;
+        if (healed > 0) {
+          combatEvents.push({
+            type: "heal",
+            sourceId: source.id,
+            targetId: source.id,
+            amount: healed,
+            attribution: { kind: "gear", id: "life-on-hit" },
+            presentation: "silent",
+          });
+        }
       }
       const lifeSteal = Number(source.passiveFlags.gearLifeStealPct ?? 0);
       if (source.team === "heroes" && lifeSteal > 0 && source.alive) {
-        applyHealing(source, hit.amount * lifeSteal, false);
-      }
-      const bloodSteal = Number(source.passiveFlags.kitBloodStealPct ?? 0);
-      const bloodLine = Number(source.passiveFlags.kitBloodLine ?? 0.45);
-      if (
-        source.team === "heroes" &&
-        bloodSteal > 0 &&
-        source.alive &&
-        source.hp / source.maxHp < bloodLine
-      ) {
-        applyHealing(source, hit.amount * bloodSteal, false);
+        const healed = applyHealing(source, hit.hpDamage * lifeSteal, false).healed;
+        if (healed > 0) {
+          combatEvents.push({
+            type: "heal",
+            sourceId: source.id,
+            targetId: source.id,
+            amount: healed,
+            attribution: { kind: "gear", id: "life-steal" },
+            presentation: "silent",
+          });
+        }
       }
       const thunderbrand = Number(source.passiveFlags.gearThunderbrand ?? 0);
       if (
         source.team === "heroes" &&
+        target.alive &&
         thunderbrand > 0 &&
         source.basicAttackCount % 4 === 0
       ) {
         const bonusDamage = Math.round(source.attack * thunderbrand);
-        const bonusHit = resolveHit(target, bonusDamage, this.random, source.damageElement);
-        if (bonusHit.outcome === "hit") {
-          this.events.push({
-            type: "damage",
-            sourceId: source.id,
-            targetId: target.id,
-            amount: bonusHit.amount,
-            critical: false,
-            element: source.damageElement,
-          });
-        }
+        const bonusHit = resolveDamage({
+          sourceId: source.id,
+          target,
+          context: { sourceKind: "basic", delivery: "indirect" },
+          element: source.damageElement,
+          baseDamage: bonusDamage,
+          profile: "proc",
+        }, this.random);
+        combatEvents.push(...damageEvents(
+          bonusHit,
+          true,
+          undefined,
+          { kind: "gear", id: "thunderbrand" },
+        ));
       }
       const frostbiteChance = Number(source.passiveFlags.gearFrostbiteChance ?? 0);
-      if (source.team === "heroes" && frostbiteChance > 0 && this.random.next() < frostbiteChance) {
+      if (source.team === "heroes" && target.alive && frostbiteChance > 0 && this.random.next() < frostbiteChance) {
         applyStatus(target, {
           kind: "slow",
+          effectId: "gear-frostbite-slow",
           magnitude: 0.12,
           remainingMs: 2000,
           sourceId: source.id,
         });
-        this.events.push({ type: "status:applied", targetId: target.id, kind: "slow" });
+        combatEvents.push({ type: "status:applied", targetId: target.id, kind: "slow" });
       }
       const sandscarChance = Number(source.passiveFlags.gearSandscarChance ?? 0);
-      if (source.team === "heroes" && sandscarChance > 0 && this.random.next() < sandscarChance) {
+      if (source.team === "heroes" && target.alive && sandscarChance > 0 && this.random.next() < sandscarChance) {
         applyStatus(target, {
           kind: "armorBreak",
+          effectId: "gear-sandscar-armor-break",
           magnitude: 0.12,
           remainingMs: 2000,
           sourceId: source.id,
         });
-        this.events.push({ type: "status:applied", targetId: target.id, kind: "armorBreak" });
+        combatEvents.push({ type: "status:applied", targetId: target.id, kind: "armorBreak" });
       }
-      if (!target.alive) {
-        this.events.push({ type: "unit:died", unitId: target.id });
-        this.onEnemyKilled(target);
+      if (target.alive) {
+        afterTalentBasicAttack(source, target, this.units, combatEvents);
       }
-      const thorns = Number(target.passiveFlags.gearThorns ?? 0);
-      if (thorns > 0 && source.attackRange <= 80 && source.alive) {
-        const reflected = Math.max(1, Math.round(target.attack * thorns));
-        const thornsHit = resolveHit(source, reflected, this.random, "physical");
-        if (thornsHit.outcome === "hit") {
-          this.events.push({
-            type: "damage",
-            sourceId: target.id,
-            targetId: source.id,
-            amount: thornsHit.amount,
-            critical: false,
-            element: "physical",
+      if (target.alive) {
+        afterSharedHeroPassiveBasicAttack(source, target, combatEvents);
+      }
+      afterSpecializationBasicAttack(source, target, this.units, this.random, combatEvents, hit.critical);
+      if (source.team === "enemies") {
+        combatEvents.push(...afterEnemyBasicHit(source, target, this.random, this.units));
+      }
+      const thorns = resolveThorns(
+        source,
+        target,
+        hit,
+        { sourceKind: "basic", delivery },
+        this.random,
+      );
+      if (thorns) {
+        combatEvents.push(...damageEvents(thorns));
+      }
+    }
+    this.pushCombatEvents(combatEvents);
+  }
+
+  private resolveEnemyActive(source: UnitState): boolean {
+    const ability = activeEnemyAbilityFor(source);
+    const castId = source.skillCastId;
+    if (!ability || !castId || source.skillPrepareMs !== 0) return false;
+
+    const lockedTargetIds = [...source.skillTargetIds];
+    const targets = lockedTargetIds.flatMap((targetId) => {
+      const target = this.units.find((unit) => unit.id === targetId && unit.alive);
+      return target && target.team !== source.team ? [target] : [];
+    });
+    const combatEvents: BattleEvent[] = [{
+      type: "skill:resolved",
+      castId,
+      sourceId: source.id,
+      skillId: ability.id,
+      targetIds: lockedTargetIds,
+    }];
+    combatEvents.push(...applyEnemyStatusOnly(source, targets, this.units, ability));
+    const delivery = source.attackMode === "melee" ? "contact" : "indirect";
+    const hitCount = Math.max(1, ability.hits ?? 1);
+    for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
+      for (const [targetIndex, target] of targets.entries()) {
+        if (!source.alive || !target.alive) continue;
+        let landed = ability.attackMultiplier <= 0;
+        if (ability.attackMultiplier > 0) {
+          this.prepareGuardian(target);
+          const targetMultiplier = ability.targetMultipliers?.[targetIndex] ?? 1;
+          const hit = resolveDamage({
+            sourceId: source.id,
+            target,
+            context: { sourceKind: "skill", delivery },
+            element: source.damageElement,
+            baseDamage: source.attack
+              * ability.attackMultiplier
+              * targetMultiplier
+              * outgoingElementMultiplier(source),
+            profile: "standard",
+            critChance: source.critChance,
+            defenseReduction: getStatusMagnitude(target, "armorBreak"),
+          }, this.random);
+          combatEvents.push(...damageEvents(hit, true, castId));
+          landed = hit.outcome === "hit";
+          const thorns = resolveThorns(
+            source,
+            target,
+            hit,
+            { sourceKind: "skill", delivery },
+            this.random,
+          );
+          if (thorns) combatEvents.push(...damageEvents(thorns));
+        }
+        if (ability.attackMultiplier > 0 && landed && target.alive && ability.targetStatus) {
+          applyStatus(target, {
+            kind: ability.targetStatus.kind,
+            effectId: `${ability.id}-${ability.targetStatus.kind}`,
+            magnitude: ability.targetStatus.magnitude,
+            remainingMs: ability.targetStatus.durationMs,
+            sourceId: source.id,
+          });
+          combatEvents.push({ type: "status:applied", targetId: target.id, kind: ability.targetStatus.kind });
+        }
+        if (landed && target.alive && ability.periodicDamage) {
+          const periodic = ability.periodicDamage;
+          addPeriodicEffect(target, {
+            id: ability.id,
+            kind: "damage",
+            sourceId: source.id,
+            amount: source.attack * periodic.powerPct,
+            intervalMs: periodic.intervalMs,
+            untilTickMs: periodic.intervalMs,
+            remainingTicks: periodic.ticks,
+            element: periodic.element ?? source.damageElement,
+            attribution: { kind: "periodic", id: ability.id },
           });
         }
       }
     }
-    const rapidEvery = Math.max(1, Number(source.passiveFlags.kitRapidEvery ?? 4));
-    if (
-      HERO_BY_ID[source.sourceId as HeroId]?.skillPattern === "H05" &&
-      source.basicAttackCount % rapidEvery === 0
-    ) {
-      applyStatus(source, { kind: "haste", magnitude: 0.2, remainingMs: 2500, sourceId: source.id });
+    if (ability.attackMultiplier > 0 && source.alive && ability.selfStatus) {
+      applyStatus(source, {
+        kind: ability.selfStatus.kind,
+        effectId: `${ability.id}-${ability.selfStatus.kind}`,
+        magnitude: ability.selfStatus.magnitude,
+        remainingMs: ability.selfStatus.durationMs,
+        sourceId: source.id,
+      });
+      combatEvents.push({
+        type: "status:applied",
+        targetId: source.id,
+        kind: ability.selfStatus.kind,
+      });
     }
-    if (
-      ENEMY_BY_ID[source.sourceId as keyof typeof ENEMY_BY_ID]?.kind === "elite" &&
-      source.basicAttackCount % 4 === 0
-    ) {
-      applyStatus(source, { kind: "damageReduction", magnitude: 0.2, remainingMs: 2000, sourceId: source.id });
+    if (ability.attackMultiplier > 0 && source.alive && ability.selfShieldMaxHpRatio) {
+      source.shield = Math.max(source.shield, Math.round(source.maxHp * ability.selfShieldMaxHpRatio));
     }
-  }
-
-  private castBossSkill(boss: UnitState): void {
-    const targets = this.units
-      .filter(({ team, alive }) => team === "heroes" && alive)
-      .sort((a, b) => b.x - a.x)
-      .slice(0, 2);
-    this.events.push({ type: "skill:started", sourceId: boss.id, skillId: "root-smash" });
-    for (const target of targets) {
-      const roll = calculateDamage(
-        boss.attack * 1.3 * outgoingElementMultiplier(boss),
-        target.defense,
-        boss.critChance,
-        this.random,
-        getStatusMagnitude(target, "armorBreak"),
-      );
-      this.prepareGuardian(target);
-      const hit = resolveHit(target, roll.damage, this.random, boss.damageElement);
-      if (hit.outcome === "hit") {
-        this.events.push({
-          type: "damage",
-          sourceId: boss.id,
-          targetId: target.id,
-          amount: hit.amount,
-          critical: roll.critical && !hit.blocked,
-          element: boss.damageElement,
-        });
+    const allies = this.units
+      .filter((unit) => unit.alive && unit.team === source.team)
+      .sort((left, right) => left.hp / left.maxHp - right.hp / right.maxHp || left.id.localeCompare(right.id));
+    if (ability.attackMultiplier > 0 && ability.allyStatus) {
+      const { status, count, includeSelf } = ability.allyStatus;
+      const allyTargets = includeSelf
+        ? [source, ...allies.filter((unit) => unit.id !== source.id)]
+        : allies.filter((unit) => unit.id !== source.id);
+      for (const ally of allyTargets.slice(0, count)) {
+        applyStatus(ally, { kind: status.kind, effectId: `${ability.id}-${status.kind}`, magnitude: status.magnitude, remainingMs: status.durationMs, sourceId: source.id });
+        combatEvents.push({ type: "status:applied", targetId: ally.id, kind: status.kind });
       }
-      applyStatus(target, { kind: "stun", magnitude: 1, remainingMs: 800, sourceId: boss.id });
-      this.events.push({ type: "status:applied", targetId: target.id, kind: "stun" });
     }
-    boss.skillCooldownMs = 5000;
-    boss.skillCastCount += 1;
-    this.events.push({ type: "skill:resolved", sourceId: boss.id, skillId: "root-smash", targetIds: targets.map(({ id }) => id) });
-    if (boss.hp / boss.maxHp < 0.3 && !boss.passiveFlags.enraged) {
-      applyStatus(boss, { kind: "haste", magnitude: 0.25, remainingMs: 999_999, sourceId: boss.id });
-      boss.passiveFlags.enraged = true;
+    if (ability.attackMultiplier > 0 && ability.allyShieldMaxHpRatio) {
+      const { amountPctMaxHp, count, includeSelf } = ability.allyShieldMaxHpRatio;
+      const allyTargets = includeSelf
+        ? [source, ...allies.filter((unit) => unit.id !== source.id)]
+        : allies.filter((unit) => unit.id !== source.id);
+      for (const ally of allyTargets.slice(0, count)) {
+        ally.shield = Math.max(ally.shield, Math.round(ally.maxHp * amountPctMaxHp));
+      }
     }
+    if (ability.allyHeal) {
+      const heal = ability.allyHeal;
+      const ally = allies.find((unit) => unit.id !== source.id && unit.hp < unit.maxHp);
+      if (ally) {
+        const amount = Math.min(ally.maxHp * heal.maxHpRatio, source.attack * heal.attackMultiplier);
+        const result = applyHealing(ally, amount, false);
+        if (result.healed > 0) combatEvents.push({ type: "heal", sourceId: source.id, targetId: ally.id, amount: result.healed, attribution: { kind: "activeSkill", id: ability.id } });
+      }
+    }
+    const difficultyEffect = applyDifficultySignatureMechanic(
+      source,
+      ability.id,
+      this.difficulty,
+    );
+    combatEvents.push(...difficultyEffect.events);
+    if (difficultyEffect.echoMultiplier > 0 && ability.attackMultiplier > 0) {
+      for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
+        for (const [targetIndex, target] of targets.entries()) {
+          if (!source.alive || !target.alive) continue;
+          const targetMultiplier = ability.targetMultipliers?.[targetIndex] ?? 1;
+          const echo = resolveDamage({
+            sourceId: source.id,
+            target,
+            context: { sourceKind: "skill", delivery },
+            element: source.damageElement,
+            baseDamage: source.attack
+              * ability.attackMultiplier
+              * targetMultiplier
+              * outgoingElementMultiplier(source)
+              * difficultyEffect.echoMultiplier,
+            profile: "proc",
+            critChance: 0,
+            defenseReduction: getStatusMagnitude(target, "armorBreak"),
+          }, this.random);
+          combatEvents.push(...damageEvents(
+            echo,
+            true,
+            castId,
+            { kind: "passive", id: "torment-signature-echo" },
+          ));
+        }
+      }
+    }
+    source.skillCastCount += 1;
+    completeEnemyActive(source);
+    this.pushCombatEvents(combatEvents);
+    return true;
   }
 
   private advanceWave(): void {
+    for (const hero of this.units.filter((unit) => unit.team === "heroes")) {
+      if (hero.specialization) { hero.specialization.channel = undefined; hero.specialization.trap = undefined; }
+      hero.passiveFlags.specComboStep = 0;
+      hero.passiveFlags.specComboRemainingMs = 0;
+      hero.passiveFlags.specShadowReturnPending = false;
+      hero.statuses = hero.statuses.filter((status) => status.effectId !== "devourer-channel-guard");
+    }
     if (this.bossActive) {
       this.state = "victory";
       this.events.push({ type: "battle:victory", stage: this.stage });
@@ -591,12 +991,13 @@ export class BattleSimulation {
     this.travelKind = "heroEntry";
     this.state = "travelling";
     this.stateElapsedMs = 0;
-    for (const hero of this.units.filter(({ team }) => team === "heroes")) {
-      const slotIndex = Number(hero.id.split("-")[1] ?? 0);
+    const heroes = this.units.filter(({ team }) => team === "heroes");
+    for (const [entryIndex, hero] of heroes.entries()) {
       const holdX = hero.x;
       hero.passiveFlags.holdX = holdX;
-      hero.passiveFlags.entrySlot = slotIndex;
-      hero.x = heroEntryStartX(holdX, slotIndex);
+      hero.passiveFlags.entrySlot = entryIndex;
+      hero.passiveFlags.heroEntryActive = true;
+      hero.x = heroEntryStartX(holdX, entryIndex);
       hero.targetId = null;
     }
   }
@@ -609,23 +1010,27 @@ export class BattleSimulation {
       return;
     }
 
-    let allArrived = true;
+    let frontArrived = false;
     for (const hero of this.units.filter(({ team, alive }) => team === "heroes" && alive)) {
       hero.targetId = null;
       const slotIndex = Number(hero.passiveFlags.entrySlot ?? 0);
       if (this.stateElapsedMs < slotIndex * HERO_ENTRY_STAGGER_MS) {
-        allArrived = false;
         continue;
       }
       const holdX = Number(hero.passiveFlags.holdX ?? hero.x);
       if (hero.x < holdX) {
         hero.x = Math.min(holdX, hero.x + HERO_ENTRY_SPEED * (deltaMs / 1000));
-        allArrived = false;
       } else {
         hero.x = holdX;
       }
+      if (slotIndex === 0 && hero.x >= holdX) frontArrived = true;
     }
-    if (allArrived) this.spawnCurrentWave();
+    if (frontArrived) {
+      for (const hero of this.units.filter(({ team }) => team === "heroes")) {
+        hero.passiveFlags.heroEntryActive = false;
+      }
+      this.spawnCurrentWave();
+    }
   }
 
   private spawnCurrentWave(): void {
@@ -634,7 +1039,14 @@ export class BattleSimulation {
     const holdBase = heroFront + NEXT_ENCOUNTER_GAP;
     const summonBoss = !this.bossActive && this.bossProgress >= 1;
     if (summonBoss) this.bossActive = true;
-    const enemies = createEnemyUnits(this.stage, this.wave, this.seed, holdBase, this.bossActive);
+    const enemies = createEnemyUnits(
+      this.stage,
+      this.wave,
+      this.seed,
+      holdBase,
+      this.bossActive,
+      this.difficulty,
+    );
     for (const [index, enemy] of enemies.entries()) {
       enemy.passiveFlags.holdX = enemy.x;
       enemy.passiveFlags.entrySlot = index;
@@ -653,7 +1065,7 @@ export class BattleSimulation {
     this.stateElapsedMs = 0;
     this.events.push({ type: "wave:started", wave: this.wave });
     if (this.bossActive) {
-      const bossName = STAGE_DEFINITIONS[this.stage - 1]?.bossName ?? "古树守卫";
+      const bossName = STAGE_DEFINITIONS[this.stage - 1]?.bossName ?? "区域首领";
       this.events.push({ type: "boss:intro", name: bossName });
     }
   }
@@ -666,16 +1078,24 @@ export class BattleSimulation {
       const slotIndex = Number(enemy.passiveFlags.entrySlot ?? 0);
       if (this.stateElapsedMs < slotIndex * ENEMY_ENTRY_STAGGER_MS) continue;
 
-      // Already in someone's strike window — release the entry rail and let combat take over.
-      if (heroes.some((hero) => Math.abs(hero.x - enemy.x) <= engageRange(hero) + 4
-        || Math.abs(hero.x - enemy.x) <= engageRange(enemy) + 4)) {
+      const hasTargetInRange = (): boolean => heroes.some(
+        (hero) => Math.abs(hero.x - enemy.x) <= engageRange(enemy, hero) + 4,
+      );
+
+      // Release the entry rail and make the first attack immediately available.
+      if (hasTargetInRange()) {
         enemy.passiveFlags.entryDone = true;
+        enemy.attackCooldownMs = 0;
         continue;
       }
 
       const holdX = Number(enemy.passiveFlags.holdX ?? enemy.x);
       if (enemy.x > holdX) {
-        enemy.x = Math.max(holdX, enemy.x - ENEMY_ENTRY_SPEED * (deltaMs / 1000));
+        enemy.x = Math.max(holdX, enemy.x - movementStep(enemy, deltaMs));
+        if (hasTargetInRange()) {
+          enemy.passiveFlags.entryDone = true;
+          enemy.attackCooldownMs = 0;
+        }
       } else {
         enemy.x = holdX;
         enemy.passiveFlags.entryDone = true;
@@ -691,16 +1111,16 @@ export class BattleSimulation {
 
   private createHeroUnits(
     party: readonly (HeroId | null)[],
-    levels: Partial<Record<HeroId, number>>,
+    stats: Partial<Record<HeroId, HeroCombatStats>>,
     bonuses: Partial<Record<HeroId, HeroBattleBonus>>,
     startX: Partial<Record<HeroId, number>>,
   ): UnitState[] {
     return party.flatMap((heroId, index) => {
       if (!heroId) return [];
       const definition = HERO_BY_ID[heroId];
-      const levelStats = getHeroStats(heroId, levels[heroId] ?? 1, this.heroGrowth[heroId]);
+      const combatStats = stats[heroId] ?? definition;
       const bonus = bonuses[heroId] ?? {};
-      const maxHp = Math.round((levelStats.maxHp + (bonus.maxHp ?? 0)) * (1 + (bonus.maxHpPct ?? 0)));
+      const maxHp = Math.round((combatStats.maxHp + (bonus.maxHp ?? 0)) * (1 + (bonus.maxHpPct ?? 0)));
       const formation = heroFormationOffset(definition.attackRange, index, heroId);
       return [{
         id: `hero-${index}-${heroId}`,
@@ -711,57 +1131,47 @@ export class BattleSimulation {
         y: formation.y,
         hp: maxHp,
         maxHp,
-        attack: Math.round((levelStats.attack + (bonus.attack ?? 0)) * (1 + (bonus.attackPct ?? 0))),
+        rage: 0,
+        maxRage: HERO_MAX_RAGE,
+        attack: Math.round((combatStats.attack + (bonus.attack ?? 0)) * (1 + (bonus.attackPct ?? 0))),
         defense: Math.round(
-          (levelStats.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0)),
+          (combatStats.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0)),
         ),
         damageElement: definition.damageElement,
         critChance: 0.05 + (bonus.critChance ?? 0),
+        attackMode: definition.combatRange,
         attackRange: definition.attackRange,
         moveSpeed: definition.moveSpeed * (1 + (bonus.moveSpeedPct ?? 0) / 100),
         attackIntervalMs: Math.round(definition.attackIntervalMs / (1 + (bonus.attackSpeedPct ?? 0) / 100)),
+        castSpeedPct: clampCastSpeedPct(bonus.castSpeedPct ?? 0),
         attackCooldownMs: index * 100,
-        skillCooldownMs: Math.round(
-          (ACTIVE_SKILL_BY_HERO[heroId].cooldownMs ?? 6000) *
-            (1 - Math.min(SKILL_COOLDOWN_REDUCTION_CAP, bonus.skillCooldownPct ?? 0)),
-        ),
-        ultimateCooldownMs: bonus.chosenSkillId
-          ? Math.round(
-              (HERO_SKILL_BY_ID[bonus.chosenSkillId as keyof typeof HERO_SKILL_BY_ID]?.cooldownMs ?? 12000) *
-                (1 - Math.min(SKILL_COOLDOWN_REDUCTION_CAP, bonus.skillCooldownPct ?? 0)),
-            )
-          : Number.POSITIVE_INFINITY,
+        skillTriggerMs: 0,
+        skillPrepareMs: null,
+        skillCastDurationMs: null,
+        skillCastId: null,
+        skillCastSequence: 0,
+        skillTargetIds: [],
         targetId: null,
         shield: 0,
         statuses: [],
+        periodicEffects: [],
         alive: true,
         basicAttackCount: 0,
         skillCastCount: 0,
         chosenSkillId: bonus.chosenSkillId ?? null,
-        passiveFlags: this.createGearFlags(bonus, definition.damageSchool, heroId),
+        passiveFlags: {
+          ...this.createGearFlags(bonus, definition.damageSchool, heroId),
+          formationLane: formationLane(index, "heroes"),
+        },
       }];
     });
   }
 
-  private createKitFlags(heroId: HeroId, bonus: HeroBattleBonus): Record<string, boolean | number> {
+  private createKitFlags(bonus: HeroBattleBonus): Record<string, boolean | number | string> {
     return {
-      kitUltimate: bonus.chosenSkillId ? 1 : 0,
-      kitHoldLine: 0.4,
-      kitBloodLine: 0.45,
-      kitBloodHaste: 0.25,
-      kitBloodStealPct: 0,
-      kitEmberMax: 1,
-      kitSplashBonus: 0,
-      kitHealShieldCap: 0.1,
-      kitPierceExtra: 0,
-      kitHuntAmp: 0,
-      kitHuntKillHaste: 0,
-      kitSlowAmp: 0,
-      kitFrostStun: 0,
-      kitRapidEvery: 4,
       kitHpRegenMaxHpPct: bonus.hpRegenMaxHpPct ?? 0,
       kitWaveShieldPct: bonus.waveStartShieldPct ?? 0,
-      kitWaveSkillCdrPct: bonus.waveStartSkillCdrPct ?? 0,
+      kitWaveStartRage: bonus.waveStartRage ?? 0,
     };
   }
 
@@ -769,10 +1179,11 @@ export class BattleSimulation {
     bonus: HeroBattleBonus,
     damageSchool: "physical" | "magic" = "physical",
     heroId?: HeroId,
-  ): Record<string, boolean | number> {
+  ): Record<string, boolean | number | string> {
     return {
-      ...(heroId ? this.createKitFlags(heroId, bonus) : {}),
+      ...(heroId ? this.createKitFlags(bonus) : {}),
       gearSkillDamage: bonus.skillDamagePct ?? 0,
+      heroSkillEffect: bonus.skillEffectPct ?? 0,
       gearExecute: bonus.executeDamagePct ?? 0,
       gearDamagePct: bonus.damagePct ?? 0,
       gearPrimaryAttackPct: bonus.primaryAttackPct ?? 0,
@@ -798,7 +1209,7 @@ export class BattleSimulation {
       gearHolyResist: bonus.holyResistPct ?? 0,
       gearAllResist: bonus.allResistPct ?? 0,
       gearDamageSchoolMagic: damageSchool === "magic" ? 1 : 0,
-      gearSkillCooldownPct: Math.min(SKILL_COOLDOWN_REDUCTION_CAP, bonus.skillCooldownPct ?? 0),
+      gearRageGainPct: bonus.rageGainPct ?? 0,
       gearHealPowerPct: bonus.healPowerPct ?? 0,
       gearGuardian: bonus.guardianShieldPct ?? 0,
       gearThorns: bonus.thornsPct ?? 0,
@@ -806,8 +1217,7 @@ export class BattleSimulation {
       gearFrostbiteChance: bonus.frostbiteChance ?? 0,
       gearSnowguard: bonus.snowguardShieldPct ?? 0,
       gearSnowguardShield: 0,
-      gearFrostfocus: bonus.frostfocusCooldownPct ?? 0,
-      gearFrostfocusTriggered: false,
+      gearWaveStartRage: bonus.frostfocusInitialRage ?? 0,
       gearSandscarChance: bonus.sandscarChance ?? 0,
       gearMirageGuard: bonus.mirageGuardPct ?? 0,
       gearMirageGuardUsed: false,
@@ -817,6 +1227,19 @@ export class BattleSimulation {
       gearCloudveilUsed: false,
       gearStormward: bonus.stormwardShieldPct ?? 0,
       gearStormwardUsed: false,
+      talentBasicDamagePct: bonus.talentBasicDamagePct ?? 0,
+      talentBasicRage: bonus.talentBasicRage ?? 0,
+      talentBasicProc: bonus.talentBasicProc ?? "",
+      talentBasicProcInterval: bonus.talentBasicProcInterval ?? 0,
+      talentBasicProcValue: bonus.talentBasicProcValue ?? 0,
+      talentBasicProcDurationMs: bonus.talentBasicProcDurationMs ?? 0,
+      talentActiveDamagePct: bonus.talentActiveDamagePct ?? 0,
+      talentSpecialization: bonus.talentSpecialization ?? 0,
+      augmentationTargetId: bonus.augmentationTargetId ?? "",
+      talentActiveHealPct: bonus.talentActiveHealPct ?? 0,
+      talentActiveProc: bonus.talentActiveProc ?? "",
+      talentActiveProcValue: bonus.talentActiveProcValue ?? 0,
+      talentActiveProcDurationMs: bonus.talentActiveProcDurationMs ?? 0,
       gearGuardianUsed: false,
     };
   }
@@ -824,33 +1247,23 @@ export class BattleSimulation {
   private applyGearFlags(unit: UnitState, bonus: HeroBattleBonus): void {
     const guardianUsed = unit.passiveFlags.gearGuardianUsed ?? false;
     const snowguardShield = unit.passiveFlags.gearSnowguardShield ?? 0;
-    const frostfocusTriggered = unit.passiveFlags.gearFrostfocusTriggered ?? false;
     const mirageGuardUsed = unit.passiveFlags.gearMirageGuardUsed ?? false;
     const cloudveilUsed = unit.passiveFlags.gearCloudveilUsed ?? false;
     const stormwardUsed = unit.passiveFlags.gearStormwardUsed ?? false;
-    const hold = unit.passiveFlags.hold ?? false;
-    const blood = unit.passiveFlags.blood ?? false;
-    const ember = unit.passiveFlags.ember ?? false;
-    const emberStacks = unit.passiveFlags.emberStacks ?? 0;
     const heroId = unit.sourceId as HeroId;
     const hero = HERO_BY_ID[heroId];
     const school = hero?.damageSchool ?? "physical";
+    const previousSharedPassive = unit.chosenSkillId;
     Object.assign(unit.passiveFlags, this.createGearFlags(bonus, school, heroId));
     unit.passiveFlags.gearGuardianUsed = guardianUsed;
     unit.passiveFlags.gearSnowguardShield = snowguardShield;
-    unit.passiveFlags.gearFrostfocusTriggered = frostfocusTriggered;
     unit.passiveFlags.gearMirageGuardUsed = mirageGuardUsed;
     unit.passiveFlags.gearCloudveilUsed = cloudveilUsed;
     unit.passiveFlags.gearStormwardUsed = stormwardUsed;
-    unit.passiveFlags.hold = hold;
-    unit.passiveFlags.blood = blood;
-    unit.passiveFlags.ember = ember;
-    unit.passiveFlags.emberStacks = emberStacks;
     unit.chosenSkillId = bonus.chosenSkillId ?? null;
-    if (bonus.chosenSkillId) {
-      if (!Number.isFinite(unit.ultimateCooldownMs)) unit.ultimateCooldownMs = 0;
-    } else {
-      unit.ultimateCooldownMs = Number.POSITIVE_INFINITY;
+    if (unit.chosenSkillId !== previousSharedPassive) {
+      delete unit.passiveFlags.sharedStormCooldownMs;
+      delete unit.passiveFlags.sharedBasicHitCount;
     }
   }
 
@@ -861,16 +1274,15 @@ export class BattleSimulation {
       hero.shield += amount;
       hero.passiveFlags.gearSnowguardShield = amount;
     }
-    const frostfocus = Number(hero.passiveFlags.gearFrostfocus ?? 0);
-    hero.passiveFlags.gearFrostfocusTriggered = false;
-    if (frostfocus > 0) {
-      hero.skillCooldownMs = Math.round(hero.skillCooldownMs * (1 - frostfocus));
-      hero.passiveFlags.gearFrostfocusTriggered = true;
-    }
+    const waveStartRage =
+      Number(hero.passiveFlags.gearWaveStartRage ?? 0) +
+      Number(hero.passiveFlags.kitWaveStartRage ?? 0);
+    if (waveStartRage > 0) grantRage(hero, waveStartRage);
     const tailwind = Number(hero.passiveFlags.gearTailwind ?? 0);
     if (tailwind > 0) {
       applyStatus(hero, {
         kind: "haste",
+        effectId: "gear-tailwind-haste",
         magnitude: tailwind,
         remainingMs: 3000,
         sourceId: `${hero.id}:tailwind`,
@@ -880,13 +1292,6 @@ export class BattleSimulation {
     const waveShield = Number(hero.passiveFlags.kitWaveShieldPct ?? 0);
     if (waveShield > 0) {
       hero.shield += Math.round(hero.maxHp * waveShield);
-    }
-    const waveCdr = Number(hero.passiveFlags.kitWaveSkillCdrPct ?? 0);
-    if (waveCdr > 0) {
-      hero.skillCooldownMs = Math.round(hero.skillCooldownMs * (1 - waveCdr));
-      if (Number.isFinite(hero.ultimateCooldownMs)) {
-        hero.ultimateCooldownMs = Math.round(hero.ultimateCooldownMs * (1 - waveCdr));
-      }
     }
   }
 

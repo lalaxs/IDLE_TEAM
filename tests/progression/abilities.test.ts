@@ -18,24 +18,26 @@ import { createDefaultSave, repairSaveData } from "../../src/persistence/schema"
 
 describe("ability upgrades", () => {
   it("scales upgrade cost with level", () => {
-    expect(getAbilityUpgradeCost(0)).toBe(80);
-    expect(getAbilityUpgradeCost(1)).toBeGreaterThan(getAbilityUpgradeCost(0));
-    expect(getAbilityUpgradeCost(10)).toBeGreaterThan(getAbilityUpgradeCost(5));
+    expect(getAbilityUpgradeCost("gold_flat", 0)).toBe(600);
+    expect(getAbilityUpgradeCost("offline_gold_percent", 0)).toBe(1200);
+    expect(getAbilityUpgradeCost("hero_attack", 0)).toBe(800);
+    expect(getAbilityUpgradeCost("damage_reduction", 0)).toBe(2560);
+    expect(getAbilityUpgradeCost("hero_attack", 10)).toBeGreaterThan(getAbilityUpgradeCost("hero_attack", 5));
   });
 
   it("applies flat then percent gold bonuses", () => {
     const levels = createDefaultAbilityLevels();
     levels.gold_flat = 2;
     levels.gold_percent = 10;
-    expect(applyGoldAbilityBonus(100, levels)).toBe(Math.round((100 + 20) * 1.1));
+    expect(applyGoldAbilityBonus(100, levels)).toBe(Math.round((100 + 10) * 1.1));
   });
 
   it("boosts stage gold when amount abilities are provided", () => {
-    const base = generateStageRewards(1, 42).gold;
+    const base = generateStageRewards(1, 42, undefined, "hard").gold;
     const levels = createDefaultAbilityLevels();
     levels.gold_flat = 5;
     levels.gold_percent = 20;
-    const boosted = generateStageRewards(1, 42, levels).gold;
+    const boosted = generateStageRewards(1, 42, levels, "hard").gold;
     // Same drop rolls (chance unchanged); amount abilities scale the payout.
     expect(boosted).toBe(base > 0 ? applyGoldAbilityBonus(base, levels) : 0);
     if (base > 0) expect(boosted).toBeGreaterThan(base);
@@ -44,7 +46,7 @@ describe("ability upgrades", () => {
   it("raises gold drop chance with the gold_drop_chance ability", () => {
     const levels = createDefaultAbilityLevels();
     expect(getGoldDropChance()).toBeCloseTo(0.15, 5);
-    levels.gold_drop_chance = 10;
+    levels.gold_drop_chance = 20;
     expect(getGoldDropChance(levels)).toBeCloseTo(0.25, 5);
 
     let baseTotal = 0;
@@ -64,7 +66,7 @@ describe("ability upgrades", () => {
         gold_percent: 99,
         exp_flat: -2,
         exp_percent: 2,
-        damage_bonus: 12,
+        damage_bonus: 99,
         hero_attack: 4,
       },
     });
@@ -72,17 +74,17 @@ describe("ability upgrades", () => {
     expect(save.abilities.gold_percent).toBe(ABILITY_BY_ID.gold_percent.maxLevel);
     expect(save.abilities.exp_flat).toBe(0);
     expect(save.abilities.exp_percent).toBe(2);
-    expect(save.abilities.damage_bonus).toBe(10);
+    expect(save.abilities.damage_bonus).toBe(ABILITY_BY_ID.damage_bonus.maxLevel);
     expect(save.abilities.hero_attack).toBe(4);
   });
 
   it("spends gold to raise an ability level", () => {
     const save = createDefaultSave();
-    save.gold = 500;
+    save.gold = 1000;
     const store = new GameStore(save);
     store.dispatch({ type: "ability:upgrade", abilityId: "gold_flat" });
     expect(store.getState().save.abilities.gold_flat).toBe(1);
-    expect(store.getState().save.gold).toBe(500 - getAbilityUpgradeCost(0));
+    expect(store.getState().save.gold).toBe(1000 - getAbilityUpgradeCost("gold_flat", 0));
   });
 
   it("rejects upgrades when gold is insufficient", () => {
@@ -105,9 +107,11 @@ describe("ability upgrades", () => {
     levels.offline_gold_percent = 5;
     levels.backpack_slots = 7;
     levels.chest_progress = 4;
-    expect(applyOfflineGoldAbilityBonus(1000, levels)).toBe(1100);
-    expect(getBackpackCapacity(levels)).toBe(47);
-    expect(getChestProgressBonus(levels)).toBeCloseTo(0.04, 5);
+    expect(applyOfflineGoldAbilityBonus(1000, levels)).toBe(1050);
+    expect(getBackpackCapacity(levels)).toBe(75);
+    levels.backpack_slots = ABILITY_BY_ID.backpack_slots.maxLevel;
+    expect(getBackpackCapacity(levels)).toBe(200);
+    expect(getChestProgressBonus(levels)).toBeCloseTo(0.02, 5);
   });
 
   it("applies combat abilities onto hero bonuses", () => {
@@ -121,15 +125,15 @@ describe("ability upgrades", () => {
     save.abilities.damage_bonus = 2;
     save.abilities.damage_reduction = 3;
     const bonus = getEquipmentBonuses(save).H01!;
-    expect(bonus.attack).toBe(200);
-    expect(bonus.defense).toBe(150);
-    expect(bonus.skillCooldownPct).toBeCloseTo(0.01, 5);
+    expect(bonus.attack).toBe(10);
+    expect(bonus.defense).toBe(6);
+    expect(bonus.rageGainPct).toBeCloseTo(0.01, 5);
     expect(bonus.attackSpeedPct).toBeCloseTo(2, 5);
-    expect(bonus.physicalDamagePct).toBeCloseTo(0.04, 5);
-    expect(bonus.magicDamagePct).toBeCloseTo(0.06, 5);
-    expect(bonus.damagePct).toBeCloseTo(0.02, 5);
-    expect(bonus.damageReductionPct).toBeCloseTo(0.03, 5);
+    expect(bonus.physicalDamagePct).toBeCloseTo(0.02, 5);
+    expect(bonus.magicDamagePct).toBeCloseTo(0.03, 5);
+    expect(bonus.damagePct).toBeCloseTo(0.01, 5);
+    expect(bonus.damageReductionPct).toBeCloseTo(0.0075, 5);
     const layered = applyCombatAbilityBonus({}, save.abilities);
-    expect(layered.attack).toBe(200);
+    expect(layered.attack).toBe(10);
   });
 });

@@ -3,6 +3,10 @@ dist/
 artifacts/
 test-results/
 playwright-report/
+logs/
+tmp/
+.tmp/
+_hero_restore/
 .DS_Store
 *.tgz
 __pycache__/
@@ -15,3 +19,13 @@ nav-check.png
 
 # Art pipeline intermediates (chroma/master/review). Runtime game art lives in public/assets/.
 docs/art/generated/
+docs/art/equipment-v2/
+docs/art/skill-icons/
+docs/art/reviews/
+
+# Local visual QA and delivery captures.
+docs/delivery/
+docs/ui-preview/
+docs/ui-design-review.md
+docs/ui-style-guide.html
+docs/ui-style-guide.png

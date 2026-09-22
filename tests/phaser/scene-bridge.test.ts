@@ -14,7 +14,7 @@ describe("SceneBridge", () => {
     };
     const bridge = new SceneBridge(adapter);
     const snapshot = (units: BattleSnapshot["units"]): BattleSnapshot => ({
-      stage: 1, wave: 1, state: "engaging", elapsedMs: 0, progress: 0, bossActive: false, seed: 1, units,
+      stage: 1, difficulty: "easy", wave: 1, state: "engaging", elapsedMs: 0, progress: 0, bossActive: false, seed: 1, units,
     });
     bridge.sync(snapshot([makeUnit({ id: "a" })]), []);
     bridge.sync(snapshot([makeUnit({ id: "a", x: 200 }), makeUnit({ id: "b" })]), []);
@@ -30,7 +30,7 @@ describe("SceneBridge", () => {
       removeUnit: () => undefined,
       playEvent: () => void (events += 1),
     });
-    const snapshot: BattleSnapshot = { stage: 1, wave: 1, state: "engaging", elapsedMs: 0, progress: 0, bossActive: false, seed: 1, units: [] };
+    const snapshot: BattleSnapshot = { stage: 1, difficulty: "easy", wave: 1, state: "engaging", elapsedMs: 0, progress: 0, bossActive: false, seed: 1, units: [] };
     bridge.sync(snapshot, [{ type: "wave:started", wave: 1 }]);
     bridge.sync(snapshot, []);
     expect(events).toBe(1);

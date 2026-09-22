@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { BattleSimulation } from "../../src/simulation/BattleSimulation";
+import { getHeroStats } from "../../src/progression/HeroProgression";
+import type { BattleEvent, HeroId, UnitState } from "../../src/simulation/types";
+
+function heroStatsAtLevels(levels: Partial<Record<HeroId, number>>) {
+  return Object.fromEntries(Object.entries(levels).map(([id, level]) => [
+    id,
+    getHeroStats(id as HeroId, level ?? 1),
+  ]));
+}
 
 function clearStageWithDebug(battle: BattleSimulation): void {
-  for (let wave = 0; wave < 3; wave += 1) {
+  for (let encounter = 0; encounter < 6; encounter += 1) {
     battle.debugDefeatEnemies();
     for (let tick = 0; tick < 40; tick += 1) {
       battle.step(50);
@@ -18,7 +27,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H02", "H03", "H04", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
@@ -27,7 +36,7 @@ describe("BattleSimulation", () => {
     expect(snapshot.wave).toBe(1);
     expect(snapshot.progress).toBe(0);
     expect(snapshot.bossActive).toBe(false);
-    expect(snapshot.units.some(({ sourceId }) => sourceId === "B01")).toBe(false);
+    expect(snapshot.units.some(({ sourceId }) => sourceId === "B04")).toBe(false);
     expect(["waveIntro", "advancing"]).toContain(snapshot.state);
   });
 
@@ -35,7 +44,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H03", "H04", "H06", "H08"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
@@ -57,7 +66,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H02", "H03", "H04", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
@@ -73,32 +82,35 @@ describe("BattleSimulation", () => {
     expect(snapshot.units.filter(({ team }) => team === "enemies")).toHaveLength(0);
   });
 
-  it("fills the boss meter with trash kills and summons the boss when full", () => {
+  it("requires five trash encounters before summoning the boss", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H02", "H03", "H04", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
 
-    battle.debugDefeatEnemies();
-    for (let tick = 0; tick < 30; tick += 1) battle.step(50);
-    expect(battle.getSnapshot().bossActive).toBe(false);
+    for (let encounter = 0; encounter < 4; encounter += 1) {
+      battle.debugDefeatEnemies();
+      for (let tick = 0; tick < 30; tick += 1) battle.step(50);
+      expect(battle.getSnapshot().bossActive).toBe(false);
+      if (encounter === 1) expect(battle.getSnapshot().progress).toBeLessThan(0.5);
+    }
 
     battle.debugDefeatEnemies();
     for (let tick = 0; tick < 30; tick += 1) battle.step(50);
     const bossFight = battle.getSnapshot();
     expect(bossFight.progress).toBe(1);
     expect(bossFight.bossActive).toBe(true);
-    expect(bossFight.units.some(({ sourceId }) => sourceId === "B01")).toBe(true);
+    expect(bossFight.units.some(({ sourceId }) => sourceId === "B04")).toBe(true);
   });
 
   it("marches heroes in from the left one slot at a time when startWithTravel is set", () => {
     const battle = new BattleSimulation({
       stage: 2,
       party: ["H01", "H02", "H03", "H04", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: true,
     });
@@ -119,17 +131,27 @@ describe("BattleSimulation", () => {
     expect(moved.length).toBeGreaterThan(0);
     expect(moved.length).toBeLessThan(5);
 
-    for (let tick = 0; tick < 80; tick += 1) battle.step(50);
-    const arrived = battle.getSnapshot();
-    expect(arrived.units.filter(({ team }) => team === "enemies").length).toBeGreaterThan(0);
-    expect(Math.min(...arrived.units.filter(({ team }) => team === "heroes").map(({ x }) => x))).toBeGreaterThan(50);
+    for (let tick = 0; tick < 80 && battle.getSnapshot().state === "travelling"; tick += 1) {
+      battle.step(50);
+    }
+    const joined = battle.getSnapshot();
+    const joinedHeroes = joined.units.filter(({ team }) => team === "heroes");
+    expect(joined.units.filter(({ team }) => team === "enemies").length).toBeGreaterThan(0);
+    expect(joinedHeroes.some((hero) => hero.x < Number(hero.passiveFlags.holdX))).toBe(true);
+
+    const frontBeforeAdvance = Math.max(...joinedHeroes.map(({ x }) => x));
+    battle.step(50);
+    const frontAfterAdvance = Math.max(
+      ...battle.getSnapshot().units.filter(({ team }) => team === "heroes").map(({ x }) => x),
+    );
+    expect(frontAfterAdvance).toBeGreaterThan(frontBeforeAdvance);
   });
 
   it("keeps heroes planted between waves while the next foes spawn ahead", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H02", "H03", "H04", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
@@ -162,21 +184,26 @@ describe("BattleSimulation", () => {
     expect(heroFront).toBeGreaterThanOrEqual(Math.max(...beforeBreak));
   });
 
-  it("starts attacking during wave intro once a foe is in range", () => {
+  it("lets enemies attack immediately during wave intro once a hero is in range", () => {
     const battle = new BattleSimulation({
       stage: 1,
-      party: ["H03", "H05"],
-      heroLevels: {},
+      party: ["H01"],
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
 
+    const enemyIds = new Set(
+      battle.getSnapshot().units.filter(({ team }) => team === "enemies").map(({ id }) => id),
+    );
     let attackedDuringIntro = false;
     for (let tick = 0; tick < 120; tick += 1) {
       const stateBefore = battle.getSnapshot().state;
       battle.step(50);
       const events = battle.drainEvents();
-      if (stateBefore === "waveIntro" && events.some((event) => event.type === "attack")) {
+      if (stateBefore === "waveIntro" && events.some(
+        (event) => event.type === "attack" && enemyIds.has(event.sourceId),
+      )) {
         attackedDuringIntro = true;
         break;
       }
@@ -189,7 +216,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H02", "H03", "H04", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
@@ -211,6 +238,10 @@ describe("BattleSimulation", () => {
     for (let tick = 0; tick < 3; tick += 1) battle.step(50);
     const early = battle.getSnapshot();
     const earlyEnemies = early.units.filter(({ team }) => team === "enemies");
+    expect(openingXs[0]! - earlyEnemies[0]!.x).toBeCloseTo(
+      openingEnemies[0]!.moveSpeed * 0.15,
+      5,
+    );
     const moved = earlyEnemies.filter(({ x }, index) => x < openingXs[index]!);
     expect(moved.length).toBeGreaterThan(0);
     expect(moved.length).toBeLessThan(earlyEnemies.length);
@@ -223,7 +254,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H03", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
@@ -237,7 +268,11 @@ describe("BattleSimulation", () => {
       const attacks = battle.drainEvents().filter((event) => event.type === "attack");
       if (
         frontAlive &&
-        attacks.some((event) => event.type === "attack" && (event.sourceId.includes("H03") || event.sourceId.includes("H05")))
+        attacks.some((event) =>
+          event.type === "attack" &&
+          event.attackMode === "ranged" &&
+          (event.sourceId.includes("H03") || event.sourceId.includes("H05"))
+        )
       ) {
         rangedAttacked = true;
         break;
@@ -247,11 +282,120 @@ describe("BattleSimulation", () => {
     expect(rangedAttacked).toBe(true);
   });
 
-  it("produces a deterministic three-wave victory with debug damage", () => {
+  it("keeps an assassin behind its tank while ordinary enemies open on the tank", () => {
+    const battle = new BattleSimulation({
+      stage: 1,
+      party: ["H01", "H06", "H03"],
+      heroStats: {},
+      seed: 23,
+      startWithTravel: false,
+    });
+    const ordinaryTargets: string[] = [];
+    let maximumAssassinLead = Number.NEGATIVE_INFINITY;
+
+    for (let tick = 0; tick < 60; tick += 1) {
+      battle.step(50);
+      const events = battle.drainEvents();
+      for (const event of events) {
+        if (
+          event.type === "damage"
+          && event.sourceId.includes("E01")
+          && event.targetId.includes("H")
+        ) {
+          ordinaryTargets.push(event.targetId);
+        }
+      }
+      const tank = battle.getSnapshot().units.find(({ sourceId }) => sourceId === "H01");
+      const assassin = battle.getSnapshot().units.find(({ sourceId }) => sourceId === "H06");
+      if (tank && assassin) maximumAssassinLead = Math.max(maximumAssassinLead, assassin.x - tank.x);
+    }
+
+    expect(ordinaryTargets.length).toBeGreaterThan(0);
+    expect(ordinaryTargets.every((targetId) => targetId.includes("H01"))).toBe(true);
+    expect(maximumAssassinLead).toBeLessThanOrEqual(28.001);
+  });
+
+  it("lets a ready melee attacker hit a nearby foe when its preferred target is out of range", () => {
+    const battle = new BattleSimulation({
+      stage: 1,
+      party: ["H01", "H06"],
+      heroStats: {},
+      seed: 23,
+      startWithTravel: false,
+    });
+    const units = (battle as unknown as { units: UnitState[] }).units;
+    const tank = units.find(({ sourceId }) => sourceId === "H01")!;
+    const assassin = units.find(({ sourceId }) => sourceId === "H06")!;
+    const enemies = units.filter(({ team }) => team === "enemies");
+    const nearby = enemies[0]!;
+    const distantWounded = enemies[1]!;
+
+    tank.x = 172;
+    tank.moveSpeed = 0;
+    assassin.x = 200;
+    assassin.y = 0;
+    assassin.moveSpeed = 0;
+    assassin.attackCooldownMs = 0;
+    assassin.rage = 0;
+    nearby.x = 390;
+    nearby.y = 40;
+    nearby.moveSpeed = 0;
+    nearby.passiveFlags.entryDone = true;
+    distantWounded.x = 500;
+    distantWounded.y = 0;
+    distantWounded.hp = 1;
+    distantWounded.moveSpeed = 0;
+    distantWounded.passiveFlags.entryDone = true;
+    for (const enemy of enemies.slice(2)) enemy.alive = false;
+
+    battle.drainEvents();
+    const events: BattleEvent[] = [];
+    for (let tick = 0; tick < 3; tick += 1) {
+      battle.step(50);
+      events.push(...battle.drainEvents());
+    }
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "attack",
+      sourceId: assassin.id,
+      targetId: nearby.id,
+    }));
+  });
+
+  it("correlates a basic attack with its resolved damage event", () => {
+    const battle = new BattleSimulation({
+      stage: 1,
+      party: ["H01", "H03", "H05"],
+      heroStats: {},
+      seed: 10,
+      startWithTravel: false,
+    });
+
+    let correlated = false;
+    for (let tick = 0; tick < 160 && !correlated; tick += 1) {
+      battle.step(50);
+      const events = battle.drainEvents();
+      for (const attack of events) {
+        if (attack.type !== "attack") continue;
+        const damage = events.find(
+          (event) => event.type === "damage" && event.attackId === attack.attackId,
+        );
+        if (!damage || damage.type !== "damage") continue;
+        expect(damage.sourceId).toBe(attack.sourceId);
+        expect(damage.targetId).toBe(attack.targetId);
+        expect((damage.hpDamage ?? 0) + (damage.absorbed ?? 0)).toBe(damage.amount);
+        correlated = true;
+        break;
+      }
+    }
+
+    expect(correlated).toBe(true);
+  });
+
+  it("produces a deterministic five-pack-and-boss victory with debug damage", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H02", "H03", "H04", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 10,
       startWithTravel: false,
     });
@@ -264,7 +408,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01", "H02", "H03", "H04", "H05"],
-      heroLevels: {},
+      heroStats: {},
       seed: 21,
       startWithTravel: false,
     });
@@ -278,7 +422,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 12,
       party: ["H01", "H02", "H03", "H07", "H08"],
-      heroLevels: { H01: 20, H02: 20, H03: 20, H07: 20, H08: 20 },
+      heroStats: heroStatsAtLevels({ H01: 20, H02: 20, H03: 20, H07: 20, H08: 20 }),
       seed: 212,
       startWithTravel: false,
     });
@@ -292,7 +436,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01"],
-      heroLevels: {},
+      heroStats: {},
       heroBonuses: { H01: { snowguardShieldPct: 0.06 } },
       seed: 10,
     });
@@ -307,24 +451,23 @@ describe("BattleSimulation", () => {
     expect(secondWaveHero.shield).toBe(Math.round(secondWaveHero.maxHp * 0.06));
   });
 
-  it("shortens only the opening active cooldown of each wave with Frostfocus", () => {
+  it("grants opening rage each wave with Frostfocus", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01"],
-      heroLevels: {},
-      heroBonuses: { H01: { frostfocusCooldownPct: 0.18 } },
+      heroStats: {},
+      heroBonuses: { H01: { frostfocusInitialRage: 18 } },
       seed: 10,
     });
     const hero = battle.getSnapshot().units.find(({ sourceId }) => sourceId === "H01")!;
-    expect(hero.skillCooldownMs).toBe(4920);
-    expect(hero.passiveFlags.gearFrostfocusTriggered).toBe(true);
+    expect(hero.rage).toBe(18);
   });
 
   it("applies the full Frostbite slow after a successful basic hit", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01"],
-      heroLevels: {},
+      heroStats: {},
       heroBonuses: { H01: { frostbiteChance: 1 } },
       seed: 10,
     });
@@ -345,7 +488,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 25,
       party: ["H01"],
-      heroLevels: { H01: 20 },
+      heroStats: heroStatsAtLevels({ H01: 20 }),
       heroBonuses: { H01: { sandscarChance: 1 } },
       seed: 10,
     });
@@ -364,12 +507,14 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01"],
-      heroLevels: { H01: 20 },
+      heroStats: heroStatsAtLevels({ H01: 20 }),
       heroBonuses: { H01: { thunderbrandPct: 0.35 } },
       seed: 10,
     });
+    const internal = battle as unknown as { units: UnitState[] };
+    for (const enemy of internal.units.filter((unit) => unit.team === "enemies")) enemy.hp = enemy.maxHp = 1000000;
     let heroAttacks = 0;
-    let fourthAttackDamage: number[] = [];
+    let fourthAttackDamage: Extract<BattleEvent, { type: "damage" }>[] = [];
     for (let tick = 0; tick < 2_000 && heroAttacks < 4; tick += 1) {
       battle.step(50);
       const events = battle.drainEvents();
@@ -380,25 +525,25 @@ describe("BattleSimulation", () => {
       heroAttacks += 1;
       if (heroAttacks === 4) {
         fourthAttackDamage = events
-          .filter((event) =>
+          .filter((event): event is Extract<BattleEvent, { type: "damage" }> =>
             event.type === "damage" &&
             event.sourceId === attack.sourceId &&
             event.targetId === attack.targetId,
-          )
-          .map((event) => event.type === "damage" ? event.amount : 0);
+          );
       }
     }
-    const hero = battle.getSnapshot().units.find(({ sourceId }) => sourceId === "H01")!;
     expect(heroAttacks).toBe(4);
     expect(fourthAttackDamage).toHaveLength(2);
-    expect(fourthAttackDamage).toContain(Math.round(hero.attack * 0.35));
+    expect(fourthAttackDamage.some(
+      ({ attribution }) => attribution?.kind === "gear" && attribution.id === "thunderbrand",
+    )).toBe(true);
   });
 
   it("resets Cloudveil availability when the next wave begins", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H01"],
-      heroLevels: {},
+      heroStats: {},
       heroBonuses: { H01: { cloudveilShieldPct: 0.12 } },
       seed: 10,
     });
@@ -417,7 +562,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 1,
       party: ["H03"],
-      heroLevels: {},
+      heroStats: {},
       heroBonuses: { H03: { tailwindPct: 0.15 } },
       seed: 10,
     });
@@ -435,7 +580,7 @@ describe("BattleSimulation", () => {
     const battle = new BattleSimulation({
       stage: 12,
       party: ["H03"],
-      heroLevels: {},
+      heroStats: {},
       heroBonuses: { H03: { mirageGuardPct: 0.2 } },
       seed: 12,
     });
@@ -454,22 +599,21 @@ describe("BattleSimulation", () => {
     ).toBe(true);
   });
 
-  it("keeps Mirage Guard at three seconds beside H01's persistent reduction", () => {
+  it("keeps Mirage Guard at three seconds for protection warriors", () => {
     const battle = new BattleSimulation({
       stage: 48,
       party: ["H01"],
-      heroLevels: {},
+      heroStats: {},
       heroBonuses: { H01: { mirageGuardPct: 0.2, maxHpPct: 1.5 } },
       seed: 12,
     });
     let hero = battle.getSnapshot().units.find(({ sourceId }) => sourceId === "H01");
-    for (let tick = 0; tick < 4_000 && !hero?.passiveFlags.hold; tick += 1) {
+    for (let tick = 0; tick < 4_000 && !hero?.passiveFlags.gearMirageGuardUsed; tick += 1) {
       battle.step(50);
       hero = battle.getSnapshot().units.find(({ sourceId }) => sourceId === "H01");
     }
     const mirageRemaining = hero?.statuses
       .find(({ sourceId }) => sourceId.endsWith(":mirageguard"))?.remainingMs;
-    expect(hero?.passiveFlags.hold).toBe(true);
     expect(mirageRemaining).toBeGreaterThan(0);
     expect(mirageRemaining).toBeLessThanOrEqual(3000);
   });

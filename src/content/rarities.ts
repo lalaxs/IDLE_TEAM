@@ -44,15 +44,15 @@ export const RARITY_COLORS: Record<Rarity, string> = {
 
 export const RARITY_MULTIPLIER: Record<Rarity, number> = {
   common: 1,
-  uncommon: 1.25,
-  rare: 1.55,
-  epic: 2,
-  immortal: 2.55,
-  arcane: 3.25,
-  transcendent: 4.1,
-  astral: 5.2,
-  sacred: 6.6,
-  primordial: 8.4,
+  uncommon: 1.05,
+  rare: 1.1,
+  epic: 1.16,
+  immortal: 1.22,
+  arcane: 1.29,
+  transcendent: 1.36,
+  astral: 1.43,
+  sacred: 1.51,
+  primordial: 1.6,
 };
 
 export const AFFIX_COUNT_BY_RARITY: Record<Rarity, number> = {
@@ -81,11 +81,4 @@ export function isRarity(value: unknown): value is Rarity {
 /** Grades that unlock legendary orange-text traits. */
 export function rarityHasLegendaryTrait(rarity: Rarity): boolean {
   return RARITY_RANK[rarity] >= RARITY_RANK.epic;
-}
-
-/** Scale factor for affix ranges above epic, relative to epic band. */
-export function affixRangeScale(rarity: Rarity): number {
-  if (rarity === "common") return 0;
-  if (rarity === "uncommon" || rarity === "rare" || rarity === "epic") return 1;
-  return RARITY_MULTIPLIER[rarity] / RARITY_MULTIPLIER.epic;
 }

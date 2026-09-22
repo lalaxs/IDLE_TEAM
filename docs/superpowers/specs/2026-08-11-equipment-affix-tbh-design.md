@@ -31,11 +31,11 @@
 | 传奇特效 `traitId` | 仍对标不朽 Legendary Power |
 | 品阶 / 套装 / 合成 | TBH 品阶规格 |
 
-品质 → 词条数不变：common 0 / uncommon 1 / rare 2 / epic+ 3。
+品质 → 词条数：common 0 / uncommon 1 / rare 2 / epic–immortal 3 / arcane–astral 4 / sacred–primordial 5。
 
 ## 3. 词条池（TBH 核心可映射）
 
-区间：`uncommon / rare / epic`；更高品阶用既有 `affixRangeScale` 放大。
+区间：`uncommon / rare / epic`；更高品阶沿用 epic 区间。百分比强度由词条数量与搭配扩展，不再随品阶重复乘算；大词条取普通上限的 125%。
 
 | id | TBH 原文 | 效果 | uncommon | rare | epic |
 |---|---|---|---|---|---|
@@ -65,7 +65,7 @@
 冷却缩减与特质 `skillCooldownPct` 叠乘，**合计上限 40%**。  
 闪避 / 格挡分别 **上限 35%**。  
 **不做**「对精英伤害 / 残血增伤」：本作无玩家可感知的精英与残血阈值玩法。  
-英雄伤害学派：物攻英雄（洛恩/布兰/塔林/乌鸦）吃物理伤害；法系（米娅/诺拉/塞拉/海泽）吃法术伤害。
+英雄伤害学派：物攻英雄（罗德里克/格雷戈尔/凯洛/维克托）吃物理伤害；法系（艾琳娜/嘉芙莲/伊芙琳/塔格尔）吃法术伤害。
 
 ### 3.1 部位（武器 / 护甲 / 饰品）
 

@@ -3,14 +3,19 @@ import {
   applyDamage,
   applyHealing,
   calculateDamage,
+  damageEvents,
+  gearDamageMultiplier,
   incomingElementResist,
   outgoingElementMultiplier,
+  resolveDamage,
   resolveHit,
   schoolDamageMultiplier,
   elementDamageMultiplier,
+  type DamageResult,
 } from "../../src/simulation/CombatSystem";
 import { ELEMENTAL_ATTACK_AMP, ELEMENT_RESIST_CAP } from "../../src/content/damageElements";
 import type { RandomSource } from "../../src/simulation/RandomSource";
+import { resolveThorns } from "../../src/simulation/ThornsSystem";
 import { makeUnit } from "../support/makeUnit";
 
 const fixedRandom: RandomSource = {
@@ -18,6 +23,24 @@ const fixedRandom: RandomSource = {
   int: (min) => min,
   pick: <T>(values: readonly T[]) => values[0]!,
 };
+
+const hitResult = (overrides: Partial<DamageResult> = {}): DamageResult => ({
+  outcome: "hit",
+  sourceId: "attacker",
+  targetId: "defender",
+  context: { sourceKind: "basic", delivery: "contact" },
+  element: "physical",
+  rawDamage: 200,
+  rolledDamage: 200,
+  mitigatedDamage: 200,
+  absorbed: 50,
+  hpDamage: 150,
+  appliedDamage: 200,
+  critical: false,
+  blocked: false,
+  killed: false,
+  ...overrides,
+});
 
 describe("combat formulas", () => {
   it("applies soft armor, deterministic variance, and critical multiplier", () => {
@@ -37,6 +60,86 @@ describe("combat formulas", () => {
     expect(result.absorbed).toBe(30);
     expect(target.hp).toBe(80);
     expect(target.shield).toBe(0);
+  });
+
+  it("reports damage from the amount actually applied", () => {
+    const target = makeUnit({
+      hp: 100,
+      maxHp: 100,
+      shield: 30,
+      passiveFlags: { gearDamageReduction: 0.5 },
+    });
+    const result = resolveDamage({
+      sourceId: "attacker",
+      target,
+      context: { sourceKind: "skill", delivery: "indirect" },
+      element: "physical",
+      baseDamage: 100,
+      profile: "proc",
+    }, fixedRandom);
+
+    expect(result).toMatchObject({ mitigatedDamage: 50, absorbed: 30, hpDamage: 20, appliedDamage: 50 });
+    expect(damageEvents(result)).toEqual([{
+      type: "damage",
+      sourceId: "attacker",
+      targetId: target.id,
+      amount: 50,
+      critical: false,
+      element: "physical",
+      hpDamage: 20,
+      absorbed: 30,
+    }]);
+  });
+
+  it("gains hero rage from hp damage", () => {
+    const target = makeUnit({ hp: 100, maxHp: 100, rage: 0, maxRage: 100 });
+    applyDamage(target, 20);
+    expect(target.rage).toBe(10);
+  });
+
+  it("reflects a percentage of contact damage actually received", () => {
+    const attacker = makeUnit({
+      hp: 100,
+      maxHp: 100,
+      shield: 4,
+      passiveFlags: { gearDamageReduction: 0.5, gearDodgeChance: 1 },
+    });
+    const defender = makeUnit({ passiveFlags: { gearThorns: 0.1 } });
+    const result = resolveThorns(
+      attacker,
+      defender,
+      hitResult(),
+      { sourceKind: "basic", delivery: "contact" },
+      fixedRandom,
+    );
+
+    expect(result).toMatchObject({ rawDamage: 20, appliedDamage: 10, hpDamage: 6, absorbed: 4, killed: false });
+    expect(attacker.hp).toBe(94);
+  });
+
+  it("does not trigger thorns for projectile, indirect, or dodged hits", () => {
+    const attacker = makeUnit();
+    const defender = makeUnit({ passiveFlags: { gearThorns: 0.12 } });
+    const hit = hitResult({ hpDamage: 80, absorbed: 20, appliedDamage: 100 });
+
+    expect(resolveThorns(attacker, defender, hit, {
+      sourceKind: "basic",
+      delivery: "projectile",
+    }, fixedRandom)).toBeNull();
+    expect(resolveThorns(attacker, defender, hit, {
+      sourceKind: "periodic",
+      delivery: "indirect",
+    }, fixedRandom)).toBeNull();
+    expect(resolveThorns(attacker, defender, hitResult({
+      outcome: "dodged",
+      hpDamage: 0,
+      absorbed: 0,
+      appliedDamage: 0,
+    }), {
+      sourceKind: "basic",
+      delivery: "contact",
+    }, fixedRandom)).toBeNull();
+    expect(attacker.hp).toBe(100);
   });
 
   it("applies Mirage Guard reduction independently from normal reduction", () => {
@@ -138,6 +241,19 @@ describe("combat formulas", () => {
     expect(elementDamageMultiplier(makeUnit({ damageElement: "dark", passiveFlags: flags }))).toBeCloseTo(1.15);
     expect(elementDamageMultiplier(makeUnit({ damageElement: "physical", passiveFlags: flags }))).toBe(1);
     expect(elementDamageMultiplier(makeUnit({ damageElement: "holy", passiveFlags: flags }))).toBe(1);
+  });
+
+  it("adds general, school, and element damage inside one equipment bucket", () => {
+    const source = makeUnit({
+      damageElement: "fire",
+      passiveFlags: {
+        gearDamagePct: 0.1,
+        gearMagicDamage: 0.2,
+        gearDamageSchoolMagic: 1,
+        gearFireDamage: 0.18,
+      },
+    });
+    expect(gearDamageMultiplier(source)).toBeCloseTo(1.48);
   });
 
   it("converts hero defense into a small all-element resist", () => {

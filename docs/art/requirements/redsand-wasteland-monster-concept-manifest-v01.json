@@ -1,0 +1,50 @@
+{
+  "version": "1.3",
+  "status": "chapter_art_approved",
+  "chapter": {
+    "id": 3,
+    "name": "赤沙荒地",
+    "stages": ["3-1", "3-2", "3-3", "3-4", "3-5", "3-6", "3-7", "3-8", "3-9", "3-10", "3-11", "3-12"]
+  },
+  "style_reference": "docs/art/generated/monsters/chapter-02/line-normalized/review/chapter-02-monsters-120px-check-v04.png",
+  "eye_rule": "眼睛主体使用平涂色块，禁止高光点、反射点、发光和用于制造亮泽的渐变",
+  "facing_rule": "原始透明图统一朝画面右侧；游戏运行时统一水平翻转，最终战斗画面朝左并面向我方",
+  "regions": [
+    {
+      "id": "redsand_dunes",
+      "name": "赤沙驿道",
+      "palette": ["砂米", "赭粉", "暗砂岩", "草灰绿", "深棕描边"],
+      "monsters": [
+        { "slot": "C03-R01-N1", "runtime_id": "E25", "type": "normal", "name": "沙耳狐", "slug": "sandear-fox", "role": "均衡近战", "visual_anchors": ["宽大三角耳", "整块米白胸腹"], "filename": "enemy-e25.png" },
+        { "slot": "C03-R01-N2", "runtime_id": "E26", "type": "normal", "name": "疾足沙鸵", "slug": "swift-sand-ostrich", "role": "快速突进", "visual_anchors": ["梨形圆躯干", "两条粗长腿"], "filename": "enemy-e26.png" },
+        { "slot": "C03-R01-N3", "runtime_id": "E27", "type": "normal", "name": "砂钳蝎", "slug": "sandclaw-scorpion", "role": "击退与破甲", "visual_anchors": ["一对圆钳", "三段钝尾"], "filename": "enemy-e27.png" },
+        { "slot": "C03-R01-E1", "runtime_id": "E28", "type": "elite", "name": "驿甲犀", "slug": "roadplate-rhino", "role": "冲锋与周期减伤", "visual_anchors": ["铲形鼻角", "整块赭粉背甲", "宽蹄"], "filename": "enemy-e28.png" },
+        { "slot": "C03-R01-B1", "runtime_id": "B28", "type": "boss", "name": "双丘巨驼", "slug": "twin-dune-camel", "role": "震沙压制与低血加速", "visual_anchors": ["同色双圆驼峰", "清晰弯曲中短颈", "两趾驼足", "短圆驼嘴", "暗色腹带"], "filename": "enemy-b28.png" }
+      ]
+    },
+    {
+      "id": "redsand_wind_canyon",
+      "name": "风蚀峡谷",
+      "palette": ["陶土", "砖棕", "灰紫", "河床灰米", "深棕描边"],
+      "monsters": [
+        { "slot": "C03-R02-N1", "runtime_id": "E29", "type": "normal", "name": "层甲犰狳", "slug": "layered-armadillo", "role": "均衡前排", "visual_anchors": ["三块宽背带", "小圆耳"], "filename": "enemy-e29.png" },
+        { "slot": "C03-R02-N2", "runtime_id": "E30", "type": "normal", "name": "疾足走鹃", "slug": "swift-roadrunner", "role": "快速游击", "visual_anchors": ["后掠宽尾", "两条粗腿"], "filename": "enemy-e30.png" },
+        { "slot": "C03-R02-N3", "runtime_id": "E31", "type": "normal", "name": "裂风颚兽", "slug": "riftwind-jawbeast", "role": "远程风压", "visual_anchors": ["两道颈侧风孔", "三片相连背脊", "河床灰米宽颚"], "filename": "enemy-e31.png" },
+        { "slot": "C03-R02-E1", "runtime_id": "E32", "type": "elite", "name": "峡脊鬣狗", "slug": "canyon-ridge-hyena", "role": "范围压制与易伤", "visual_anchors": ["整块层岩背鬃", "宽口鼻", "厚前掌"], "filename": "enemy-e32.png" },
+        { "slot": "C03-R02-B1", "runtime_id": "B32", "type": "boss", "name": "风蚀盘羊", "slug": "windcarved-ram", "role": "冲撞连击与低血蓄力", "visual_anchors": ["宽螺旋角", "层岩肩峰", "宽蹄", "灰紫腹带"], "filename": "enemy-b32.png" }
+      ]
+    },
+    {
+      "id": "redsand_sunken_city",
+      "name": "沉沙古城",
+      "palette": ["砂岩灰米", "深褐", "暗青灰", "氧化铜绿", "深棕描边"],
+      "monsters": [
+        { "slot": "C03-R03-N1", "runtime_id": "E33", "type": "normal", "name": "砂掌灵猫", "slug": "sandpaw-civet", "role": "均衡近战", "visual_anchors": ["紧凑圆身", "宽前掌", "回弯短尾", "暗青尾带"], "filename": "enemy-e33.png" },
+        { "slot": "C03-R03-N2", "runtime_id": "E34", "type": "normal", "name": "铜翼幼龙", "slug": "verdigris-wing-drake", "role": "快速远程", "visual_anchors": ["双区翼膜", "铜绿翼前缘", "铲形尾端"], "filename": "enemy-e34.png" },
+        { "slot": "C03-R03-N3", "runtime_id": "E35", "type": "normal", "name": "拱背砂鳄", "slug": "archback-crocodile", "role": "高防与护卫", "visual_anchors": ["拱形背甲", "宽钝口鼻"], "filename": "enemy-e35.png" },
+        { "slot": "C03-R03-E1", "runtime_id": "E36", "type": "elite", "name": "拱盾兽", "slug": "archshield-beast", "role": "击退与群体减伤", "visual_anchors": ["单块圆拱头肩盾", "铜绿宽带", "短圆尾"], "filename": "enemy-e36.png" },
+        { "slot": "C03-R03-B1", "runtime_id": "B36", "type": "boss", "name": "王庭拱背兽", "slug": "royal-archback-beast", "role": "王庭踏震与低血减伤", "visual_anchors": ["整块砂岩拱背", "巨大前掌", "铜绿胸斑"], "filename": "enemy-b36.png" }
+      ]
+    }
+  ]
+}

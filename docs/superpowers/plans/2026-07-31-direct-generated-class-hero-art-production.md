@@ -16,6 +16,8 @@
 - No body templates, equipment overlays, modular pieces, compositing, or sprite sheets.
 - One complete right-facing three-quarter character per image.
 - Final master format is 1024 × 1024 transparent PNG.
+- Every hero body uses the same `760 px` body-frame height, `x=512` body center and `y=930` foot baseline; held equipment and detached effects do not participate in body scaling.
+- All equipment must pass a right-facing mechanical check for grip position, guard or weapon-head direction, shield face and bow-string orientation. Both weapons in every dual-wield attack loadout point screen-right; every weapon-and-shield loadout puts the attack weapon in the anatomical left hand on screen-right and the shield in the anatomical right hand on screen-left.
 - Delivery occurs only after all 80 assets pass mechanical and visual review.
 - No third-party named character, exact armor set, artifact weapon, faction mark, logo, text, or watermark.
 
@@ -116,15 +118,19 @@ Save each selected source as `docs/art/generated/heroes/chroma/hero_<id>_chroma_
 
 Run the installed helper with border auto-key, soft matte, transparent threshold 12, opaque threshold 220, and despill. Retry once with edge contraction 1 if a visible fringe remains.
 
-- [ ] **Step 4: Inspect all six anchors**
+- [ ] **Step 4: Normalize from the hero body frame**
 
-Check single-character count, right-facing three-quarter pose, 1.45–1.65-head proportion, round face, two oval eyes, absent mouth, circle hands, short legs, thick lines, restrained weapon, palette, and 96 px readability.
+Record the source-pixel bounds of the head, core torso, round hands, short legs and feet, excluding held weapons, shields and detached effects. Pass those bounds to `scripts/art/process_hero_asset.py --body-bbox LEFT TOP RIGHT BOTTOM`. If equipment exceeds the master safety area at the shared body scale, regenerate or reduce the equipment; do not shrink the hero.
 
-- [ ] **Step 5: Regenerate any failing anchor as a complete image**
+- [ ] **Step 5: Inspect all six anchors**
+
+Check single-character count, right-facing three-quarter pose, shared body scale, 1.45–1.65-head proportion, round face, two oval eyes, absent mouth, circle hands, short legs, thick lines, restrained weapon, mechanically correct equipment direction and grip, both dual-wield working ends pointing screen-right, weapon-left-hand/shield-right-hand placement, palette, and 96 px readability.
+
+- [ ] **Step 6: Regenerate any failing anchor as a complete image**
 
 Change only the failed constraint in the prompt; do not edit or composite body parts.
 
-- [ ] **Step 6: Record internal approval**
+- [ ] **Step 7: Record internal approval**
 
 Write each anchor’s `approved`, `source_prompt_id`, `generation_version`, and review checklist result to `review-status.json`.
 
@@ -208,7 +214,7 @@ Reject any missing weapon edge, extra object resembling a second character, copi
 
 - [ ] **Step 3: Build contact sheets and compare consistency**
 
-Compare line weight, head ratio, feet baseline, hand circles, eye shape, flat color count, and weapon scale across all classes.
+Compare body-frame height, line weight, head ratio, feet baseline, hand circles, eye shape, flat color count, weapon scale, grip position and equipment direction across all classes.
 
 - [ ] **Step 4: Regenerate every failed image whole**
 

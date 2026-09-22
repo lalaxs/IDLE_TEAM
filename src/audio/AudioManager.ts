@@ -1,5 +1,6 @@
 export type AudioCue =
   | "attack"
+  | "rangedAttack"
   | "hit"
   | "skill"
   | "heal"
@@ -15,6 +16,7 @@ interface AudioManagerOptions {
 
 const frequencies: Record<AudioCue, [number, number, number]> = {
   attack: [210, 0.035, 0.022],
+  rangedAttack: [520, 0.075, 0.026],
   hit: [120, 0.05, 0.032],
   skill: [420, 0.14, 0.035],
   heal: [590, 0.18, 0.032],
@@ -73,7 +75,11 @@ export class AudioManager {
     const [frequency, duration, volume] = frequencies[kind];
     const oscillator = this.context.createOscillator();
     const gain = this.context.createGain();
-    oscillator.type = kind === "hit" || kind === "defeat" ? "triangle" : "sine";
+    oscillator.type = kind === "hit" || kind === "defeat"
+      ? "triangle"
+      : kind === "rangedAttack"
+        ? "square"
+        : "sine";
     oscillator.frequency.setValueAtTime(frequency, this.context.currentTime);
     if (kind === "victory" || kind === "loot") {
       oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.5, this.context.currentTime + duration);
@@ -85,5 +91,12 @@ export class AudioManager {
     oscillator.connect(gain).connect(this.context.destination);
     oscillator.start();
     oscillator.stop(this.context.currentTime + duration);
+  }
+
+  destroy(): void {
+    const context = this.context;
+    this.context = null;
+    this.lastPlayed.clear();
+    if (context && context.state !== "closed") void context.close().catch(() => undefined);
   }
 }

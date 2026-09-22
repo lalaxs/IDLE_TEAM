@@ -15,15 +15,15 @@ export interface ChapterDefinition {
 }
 
 export const CHAPTER_DEFINITIONS: readonly ChapterDefinition[] = [
-  { id: 1, name: "青丘林地", bossName: "古树守卫", blurb: "林地与村落的边境远征。" },
-  { id: 2, name: "霜风谷", bossName: "冰封古树", blurb: "越深入雪谷，霜风装备权重越高。" },
+  { id: 1, name: "青丘林地", bossName: "碑翼古鸮", blurb: "林地与村落的边境远征。" },
+  { id: 2, name: "霜风谷", bossName: "极光冠鸮", blurb: "越深入雪谷，霜风装备权重越高。" },
   { id: 3, name: "赤沙荒地", bossName: "赤沙守卫", blurb: "穿过干河与遗迹，赤沙装备权重升高。" },
   { id: 4, name: "雷崖高地", bossName: "苍雷守卫", blurb: "踏过雷崖，苍雷装备权重升高。" },
-  { id: 5, name: "黑水湿地", bossName: "沼心守卫", blurb: "黑水漫过浅滩，湿地装备开始成型。" },
-  { id: 6, name: "燃烧荒地", bossName: "烬岩守卫", blurb: "焦土岩脉中，燃烧系装备权重升高。" },
-  { id: 7, name: "暗潮海岸", bossName: "潮岩守卫", blurb: "岩岸潮汐带来暗潮装备。" },
+  { id: 5, name: "黑水湿地", bossName: "雾苇沼龙", blurb: "黑水漫过浅滩，湿地装备开始成型。" },
+  { id: 6, name: "燃烧荒地", bossName: "烬炉督军", blurb: "焦土岩脉中，燃烧系装备权重升高。" },
+  { id: 7, name: "暗潮海岸", bossName: "潮垒酋领", blurb: "岩岸潮汐带来暗潮装备。" },
   { id: 8, name: "哀嚎丘陵", bossName: "丘墓守卫", blurb: "荒丘旧战场，毕业档开始出现。" },
-  { id: 9, name: "石牙山脉", bossName: "石牙守卫", blurb: "石山矿道中掉落高档装备。" },
+  { id: 9, name: "石牙山脉", bossName: "天脊岩主", blurb: "石山矿道中掉落高档装备。" },
   { id: 10, name: "北风关隘", bossName: "北风关将", blurb: "苦寒边关，主线收束与高档验证。" },
 ] as const;
 
@@ -53,7 +53,7 @@ export const CHAPTER_NUMERAL: Record<ChapterId, string> = {
   10: "十",
 };
 
-/** Reuse Ch1–4 background assets for Ch5–10 until art lands. */
+/** Resolve the legacy composite fallback; dedicated layered packs override it per chapter. */
 export function visualChapter(chapter: ChapterId): 1 | 2 | 3 | 4 {
   return (((chapter - 1) % 4) + 1) as 1 | 2 | 3 | 4;
 }

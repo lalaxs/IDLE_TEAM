@@ -4,8 +4,15 @@ import { createDefaultSave } from "../../src/persistence/schema";
 import { createEquipment } from "../../src/progression/EquipmentSystem";
 import { SeededRandom } from "../../src/simulation/RandomSource";
 
+function createSessionSave() {
+  const save = createDefaultSave();
+  save.party = ["H01", null, null, null, null];
+  for (const id of ["H01", "H02", "H03", "H04", "H05", "H06"] as const) save.roster[id].unlocked = true;
+  return save;
+}
+
 function clearStageWithDebug(session: GameSession): void {
-  for (let wave = 0; wave < 3; wave += 1) {
+  for (let encounter = 0; encounter < 6; encounter += 1) {
     session.debugDefeatEnemies();
     for (let tick = 0; tick < 40; tick += 1) {
       session.step(50);
@@ -16,19 +23,23 @@ function clearStageWithDebug(session: GameSession): void {
 }
 
 describe("GameSession", () => {
-  it("awards and advances exactly once after a three-wave victory", () => {
-    const session = new GameSession(createDefaultSave(), 42);
+  it("awards and advances exactly once after a five-pack-and-boss victory", () => {
+    const session = new GameSession(createSessionSave(), 42);
+    const chestStartedAt = session.store.getState().save.lootChest.startedAt;
     clearStageWithDebug(session);
     const goldAfterVictory = session.store.getState().save.gold;
     expect(session.store.getState().save.highestClearedStage).toBe(1);
     expect(session.store.getState().save.currentStage).toBe(2);
     expect(session.store.getState().save.exp).toBeGreaterThan(120);
+    expect(session.store.getState().save.lootChest.startedAt).toBe(chestStartedAt);
     session.step(1000);
     expect(session.store.getState().save.gold).toBe(goldAfterVictory);
   });
 
   it("restarts the selected stage with the latest party", () => {
-    const session = new GameSession(createDefaultSave(), 42);
+    const save = createSessionSave();
+    save.highestClearedStage = 17;
+    const session = new GameSession(save, 42);
     session.store.dispatch({
       type: "party:commit",
       party: ["H01", "H02", "H03", "H04", "H06"],
@@ -39,7 +50,9 @@ describe("GameSession", () => {
   });
 
   it("continues into the next stage with a staggered left-edge entry", () => {
-    const session = new GameSession(createDefaultSave(), 42);
+    const save = createSessionSave();
+    save.party = ["H01", "H02", "H03", "H04", "H05"];
+    const session = new GameSession(save, 42);
     clearStageWithDebug(session);
 
     session.continueToNextStage();
@@ -54,7 +67,7 @@ describe("GameSession", () => {
   });
 
   it("starts an automatic stage continuation with a march before enemies arrive", () => {
-    const save = createDefaultSave();
+    const save = createSessionSave();
     save.currentStage = 2;
     const session = new GameSession(save, 42);
 
@@ -66,7 +79,7 @@ describe("GameSession", () => {
   });
 
   it("applies equipped item stats to the battle snapshot", () => {
-    const save = createDefaultSave();
+    const save = createSessionSave();
     const weapon = createEquipment("weapon_guard_blade", 1, "rare", new SeededRandom(3));
     save.inventory.push(weapon);
     save.roster.H01.equipment.main_weapon = weapon.instanceId;
@@ -78,27 +91,41 @@ describe("GameSession", () => {
     expect(lorne?.attack).toBe(90 + (weapon.stats.attack ?? 0) + flatAttack);
   });
 
+  it("carries equipment cast speed into the battle snapshot", () => {
+    const save = createSessionSave();
+    const weapon = createEquipment("weapon_guard_blade", 1, "rare", new SeededRandom(5));
+    weapon.affixes = [{ affixId: "cast_speed", value: 7 }];
+    save.inventory.push(weapon);
+    save.roster.H01.equipment.main_weapon = weapon.instanceId;
+
+    const session = new GameSession(save, 42);
+
+    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.castSpeedPct).toBe(7);
+  });
+
   it("refreshes live hero stats after leveling without resetting the wave", () => {
-    const save = createDefaultSave();
-    save.gold = 80;
+    const save = createSessionSave();
+    save.roster.H01.experience = 11;
     const session = new GameSession(save, 42);
     session.store.dispatch({ type: "hero:levelUp", heroId: "H01" });
-    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.maxHp).toBe(1539);
+    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.maxHp).toBe(1554);
     expect(session.snapshot.wave).toBe(1);
   });
 
-  it("keeps star flats after refresh and does not reset the wave", () => {
-    const save = createDefaultSave();
+  it("refreshes star skill effects and does not reset the wave", () => {
+    const save = createSessionSave();
     save.roster.H01.marks = 100;
     const session = new GameSession(save, 42);
     const before = session.snapshot.units.find(({ sourceId }) => sourceId === "H01")!.maxHp;
     session.store.dispatch({ type: "hero:starUp", heroId: "H01" });
-    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.maxHp).toBeGreaterThan(before);
+    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.maxHp).toBe(before);
+    expect(session.snapshot.units.find(({ sourceId }) => sourceId === "H01")?.passiveFlags.heroSkillEffect).toBeCloseTo(.02);
     expect(session.snapshot.wave).toBe(1);
   });
 
   it("carries all equipped combat traits into hero rule state", () => {
-    const save = createDefaultSave();
+    const save = createSessionSave();
+    save.party = ["H01", "H02", "H03", null, null];
     const definitions = [
       ["H01", "weapon_guard_blade", "sharp"],
       ["H01", "armor_guard_mail", "guardian"],
@@ -129,7 +156,7 @@ describe("GameSession", () => {
   });
 
   it("carries all three Frostland traits into hero rule state", () => {
-    const save = createDefaultSave();
+    const save = createSessionSave();
     const definitions = [
       ["weapon_frost_fang_saber", "frostbite"],
       ["armor_snow_travel_coat", "snowguard"],
@@ -146,11 +173,11 @@ describe("GameSession", () => {
     const lorne = session.snapshot.units.find(({ sourceId }) => sourceId === "H01")!;
     expect(lorne.passiveFlags.gearFrostbiteChance).toBe(0.15);
     expect(lorne.passiveFlags.gearSnowguard).toBe(0.06);
-    expect(lorne.passiveFlags.gearFrostfocus).toBe(0.18);
+    expect(lorne.passiveFlags.gearWaveStartRage).toBe(18);
   });
 
   it("carries all three Red Sands traits into hero rule state", () => {
-    const save = createDefaultSave();
+    const save = createSessionSave();
     const definitions = [
       ["weapon_dune_crescent_sickle", "sandscar"],
       ["armor_dustwalker_mantle", "mirageguard"],
@@ -171,7 +198,7 @@ describe("GameSession", () => {
   });
 
   it("carries all three Stormsea traits into hero rule state", () => {
-    const save = createDefaultSave();
+    const save = createSessionSave();
     const definitions = [
       ["weapon_cloudsplitter_glaive", "thunderbrand"],
       ["armor_cloudwarden_cloak", "cloudveil"],

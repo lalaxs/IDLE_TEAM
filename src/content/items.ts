@@ -117,17 +117,6 @@ const CORE_ITEM_DEFINITIONS = [
   { id: "accessory_skycrystal_prism", name: "天穹晶", slot: "amulet" as const, icon: "/assets/equipment/accessory_skycrystal_prism.webp", chapter: 4 as const },
 ];
 
-const LEGACY_SET_TAGS: Partial<Record<string, SetId>> = {
-  armor_scale_vest: "set_moss_crown",
-  armor_guard_mail: "set_moss_crown",
-  weapon_frost_fang_saber: "set_frost_bite",
-  armor_ice_ridge_plate: "set_frost_bite",
-  weapon_scarab_codex: "set_sand_scar",
-  armor_oasis_robe: "set_sand_scar",
-  weapon_tempest_codex: "set_storm_tide",
-  armor_skyweave_robe: "set_storm_tide",
-};
-
 function toDefinition(seed: CatalogItemSeed): ItemDefinition {
   return {
     id: seed.id,
@@ -141,18 +130,12 @@ function toDefinition(seed: CatalogItemSeed): ItemDefinition {
     retireChapter: seed.retireChapter,
     minGrade: seed.minGrade,
     maxGrade: seed.maxGrade,
-    setId: seed.setId,
   };
 }
 
 const LEGACY_ITEMS: ItemDefinition[] = [
   ...CORE_ITEM_DEFINITIONS.map((item) =>
-    toDefinition(
-      enrichLegacyItem({
-        ...item,
-        setId: LEGACY_SET_TAGS[item.id],
-      }),
-    ),
+    toDefinition(enrichLegacyItem(item)),
   ),
   ...EXPANDED_ITEM_DEFINITIONS.map((item) =>
     toDefinition(
@@ -177,13 +160,13 @@ const CORE_TRAIT_DEFINITIONS = [
   { id: "execute", name: "处决", slot: "main_weapon" as const, description: "对残血目标增伤" },
   { id: "tenacious", name: "坚韧", slot: "armor" as const, description: "最大生命提高" },
   { id: "guardian", name: "守护", slot: "armor" as const, description: "每波首次受击获得护盾" },
-  { id: "thorns", name: "荆棘", slot: "armor" as const, description: "反弹近战伤害" },
-  { id: "focus", name: "专注", slot: "amulet" as const, description: "技能冷却缩短" },
+  { id: "thorns", name: "荆棘", slot: "armor" as const, description: "反弹受到的近战伤害" },
+  { id: "focus", name: "专注", slot: "amulet" as const, description: "怒气获取提高" },
   { id: "renewal", name: "复苏", slot: "amulet" as const, description: "波次结束时恢复生命" },
   { id: "precision", name: "精准", slot: "amulet" as const, description: "暴击率提高" },
   { id: "frostbite", name: "霜咬", slot: "main_weapon" as const, description: "普攻有概率使目标移速与攻速降低12%" },
   { id: "snowguard", name: "雪护", slot: "armor" as const, description: "每波开始获得最大生命6%的护盾" },
-  { id: "frostfocus", name: "凝霜", slot: "amulet" as const, description: "每波首次主动技能冷却缩短18%" },
+  { id: "frostfocus", name: "凝霜", slot: "amulet" as const, description: "每波开始获得18点怒气" },
   { id: "sandscar", name: "沙痕", slot: "main_weapon" as const, description: "普攻有15%概率使目标防御降低12%，持续2秒" },
   { id: "mirageguard", name: "蜃护", slot: "armor" as const, description: "每波首次低于半血时获得20%减伤，持续3秒" },
   { id: "tailwind", name: "逐风", slot: "amulet" as const, description: "每波开始时移速与攻速提高15%，持续3秒" },
@@ -192,7 +175,7 @@ const CORE_TRAIT_DEFINITIONS = [
   { id: "stormward", name: "雷佑", slot: "amulet" as const, description: "每波首次施放主动技能时获得最大生命10%的护盾" },
   { id: "bogvenom", name: "沼毒", slot: "main_weapon" as const, description: "普攻有12%概率附加持续伤害" },
   { id: "mireguard", name: "泥护", slot: "armor" as const, description: "每波开始获得最大生命7%的护盾" },
-  { id: "fenfocus", name: "萤凝", slot: "amulet" as const, description: "每波首次技能冷却缩短15%" },
+  { id: "fenfocus", name: "萤凝", slot: "amulet" as const, description: "每波开始获得15点怒气" },
   { id: "emberbrand", name: "烬铭", slot: "main_weapon" as const, description: "每第5次普攻追加燃烧真实伤害" },
   { id: "ashplate", name: "灰障", slot: "armor" as const, description: "受击时有概率获得短暂减伤" },
   { id: "cinderfocus", name: "余烬", slot: "amulet" as const, description: "技能伤害提高" },
@@ -207,7 +190,7 @@ const CORE_TRAIT_DEFINITIONS = [
   { id: "peakfocus", name: "峰凝", slot: "amulet" as const, description: "全伤害提高" },
   { id: "northbrand", name: "北铭", slot: "main_weapon" as const, description: "普攻速度提高" },
   { id: "gateguard", name: "关障", slot: "armor" as const, description: "每波首次致命伤害保留1生命" },
-  { id: "galefocus", name: "风凝", slot: "amulet" as const, description: "技能冷却缩短" },
+  { id: "galefocus", name: "风凝", slot: "amulet" as const, description: "怒气获取提高" },
 ];
 
 export const TRAIT_DEFINITIONS: readonly TraitDefinition[] = [

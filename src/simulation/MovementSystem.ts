@@ -1,18 +1,33 @@
 import { ENEMY_BY_ID } from "../content/enemies";
+import { getEnemyCombatProfile } from "../content/enemyCombatProfiles";
+import { HERO_BY_ID } from "../content/heroes";
 import { getStatusMagnitude, isStunned } from "./StatusSystem";
-import { selectTarget } from "./TargetingSystem";
-import type { BattleEvent, EnemyId, UnitState } from "./types";
+import {
+  isTankUnit,
+  resolveMeleeFrontTarget,
+  selectTarget,
+  selectTauntTarget,
+} from "./TargetingSystem";
+import type { BattleEvent, EnemyId, HeroId, UnitState } from "./types";
 
-/** Ally footprint gap along world X — close enough to allow formation ranks to settle. */
-const HERO_GAP = 64;
-const ENEMY_GAP = 48;
-/**
- * Extra stop distance for short-range units. Attack range alone (~55) is smaller
- * than a sprite, so units otherwise walk into each other's art before striking.
- */
-const MELEE_CONTACT = 48;
-/** Unstick true sprite piles only — do not fight engageRange every tick. */
-const BODY_OVERLAP = 52;
+/** Same-team spacing keeps a readable rank without flattening the lane formation. */
+const HERO_GAP = 82;
+const ENEMY_GAP = 74;
+/** Non-tank melee may edge past the tank, but never become the natural vanguard. */
+const NON_TANK_FRONTLINE_LEAD = 28;
+/** Extra projectile reach for ranged combatants on both teams. */
+export const RANGED_ATTACK_RANGE_BONUS = 48;
+/** Combat footprints are world-space radii, independent from sprite animation scale. */
+const HERO_BODY_RADIUS = 70;
+const NORMAL_ENEMY_BODY_RADIUS = 82;
+const ELITE_ENEMY_BODY_RADIUS = 100;
+const BOSS_ENEMY_BODY_RADIUS = 124;
+/** Projectiles may connect with the full visible silhouette rather than the ground footprint. */
+const HERO_PROJECTILE_RADIUS = 92;
+const NORMAL_ENEMY_PROJECTILE_RADIUS = 104;
+const ELITE_ENEMY_PROJECTILE_RADIUS = 122;
+const BOSS_ENEMY_PROJECTILE_RADIUS = 150;
+const MIN_MELEE_REACH = 30;
 
 export function advanceMovement(
   units: UnitState[],
@@ -27,28 +42,104 @@ export function advanceMovement(
     if (!unit.alive || isStunned(unit)) continue;
     if (allowed && !allowed.includes(unit.team)) continue;
     if (options.skip?.(unit)) continue;
+    // A visible cast bar means the unit has planted to complete the spell.
+    if (unit.skillPrepareMs !== null || unit.specialization?.channel) continue;
     const current = units.find(({ id }) => id === unit.targetId && id !== unit.id);
-    const target =
-      current?.alive && current.team !== unit.team
+    const enemyDefinition = unit.team === "enemies"
+      ? ENEMY_BY_ID[unit.sourceId as EnemyId]
+      : undefined;
+    const strategy = enemyDefinition
+      ? getEnemyCombatProfile(
+          enemyDefinition.combatProfileId,
+          enemyDefinition.kind,
+        ).targetStrategy
+      : "nearestEnemy";
+    const taunted = selectTauntTarget(unit, units);
+    const preferredTarget =
+      taunted
+        ? taunted
+        : current?.alive && current.team !== unit.team
         ? current
-        : selectTarget(unit, units, "nearestEnemy");
+        : selectTarget(unit, units, strategy);
+    const target = resolveMeleeFrontTarget(unit, preferredTarget, units);
     unit.targetId = target?.id ?? null;
     if (!target) continue;
-    const direction = Math.sign(target.x - unit.x);
-    const distance = Math.abs(target.x - unit.x);
-    const range = engageRange(unit);
+    const direction = unit.team === "heroes" ? 1 : -1;
+    const distance = (target.x - unit.x) * direction;
+    const range = engageRange(unit, target);
+    // Normal combat movement is monotonic: heroes only advance right and
+    // enemies only advance left. A target that has crossed behind never
+    // causes automatic backpedalling.
+    if (distance <= 0) continue;
     if (distance <= range) continue;
-    const slow = getStatusMagnitude(unit, "slow");
-    const haste = getStatusMagnitude(unit, "haste");
-    const movement = unit.moveSpeed * Math.max(0.2, 1 + haste - slow) * (deltaMs / 1000);
-    const allowedStep = Math.max(0, distance - range);
+    const movement = movementStep(unit, deltaMs);
+    const allowedStep = Math.min(
+      Math.max(0, distance - range),
+      sameTeamAdvanceLimit(unit, units),
+      frontlineAdvanceLimit(unit, units),
+    );
     unit.x += direction * Math.min(movement, allowedStep);
   }
-  separateAllies(units, deltaMs);
-  if (!allowed || allowed.length > 1) {
-    separateOpponents(units, deltaMs);
-  }
   return [];
+}
+
+function frontlineAdvanceLimit(unit: UnitState, units: readonly UnitState[]): number {
+  if (unit.team !== "heroes" || unit.attackMode !== "melee" || isTankUnit(unit)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const tanks = units.filter((candidate) => candidate.alive && isTankUnit(candidate));
+  if (tanks.length === 0) return Number.POSITIVE_INFINITY;
+  const frontlineX = Math.max(...tanks.map(({ x }) => x));
+  return Math.max(0, frontlineX + NON_TANK_FRONTLINE_LEAD - unit.x);
+}
+
+/**
+ * Stop a rear unit before it catches the ally in front. Equal-X ties use a
+ * stable melee-first order so formation spread never needs a backward shove.
+ */
+function sameTeamAdvanceLimit(unit: UnitState, units: readonly UnitState[]): number {
+  const direction = unit.team === "heroes" ? 1 : -1;
+  const minGap = unit.team === "heroes" ? HERO_GAP : ENEMY_GAP;
+  let limit = Number.POSITIVE_INFINITY;
+  for (const ally of units) {
+    if (!ally.alive || ally.team !== unit.team || ally.id === unit.id) continue;
+    // Units on separate ground lanes may advance in parallel. Keeping the
+    // full X gap across every lane turns the formation into a single-file queue.
+    if (!sharesFormationLane(unit, ally)) continue;
+    const forwardDistance = (ally.x - unit.x) * direction;
+    // A lower-priority backliner never blocks a frontline unit from passing.
+    if (forwardDistance > 0 && compareFormationPriority(ally, unit) > 0) continue;
+    const allyWinsTie = Math.abs(forwardDistance) < 0.001
+      && compareFormationPriority(ally, unit) < 0;
+    if (forwardDistance <= 0 && !allyWinsTie) continue;
+    limit = Math.min(limit, Math.max(0, forwardDistance - minGap));
+  }
+  return limit;
+}
+
+function sharesFormationLane(left: UnitState, right: UnitState): boolean {
+  const leftLane = left.passiveFlags.formationLane;
+  const rightLane = right.passiveFlags.formationLane;
+  if (typeof leftLane === "number" && typeof rightLane === "number") {
+    return leftLane === rightLane;
+  }
+  // Tests and externally constructed units may not carry authored lane data.
+  return Math.abs(left.y - right.y) < 12;
+}
+
+function compareFormationPriority(left: UnitState, right: UnitState): number {
+  const leftRank = left.attackMode === "melee" ? 0 : 1;
+  const rightRank = right.attackMode === "melee" ? 0 : 1;
+  return leftRank - rightRank
+    || left.attackRange - right.attackRange
+    || left.id.localeCompare(right.id);
+}
+
+/** Movement distance for one simulation step, shared by entry and combat travel. */
+export function movementStep(unit: UnitState, deltaMs: number): number {
+  const slow = getStatusMagnitude(unit, "slow");
+  const haste = getStatusMagnitude(unit, "haste");
+  return unit.moveSpeed * Math.max(0.2, 1 + haste - slow) * (deltaMs / 1000);
 }
 
 /** True when the unit has planted inside strike distance of its current foe. */
@@ -56,94 +147,41 @@ export function isPlantedForAttack(unit: UnitState, units: readonly UnitState[])
   if (!unit.alive || !unit.targetId) return false;
   const target = units.find(({ id, alive }) => id === unit.targetId && alive);
   if (!target || target.team === unit.team) return false;
-  return Math.abs(target.x - unit.x) <= engageRange(unit) + 2;
+  return Math.abs(target.x - unit.x) <= engageRange(unit, target) + 2;
 }
 
-/** Stop / strike distance. Melee gets contact padding so art does not overlap. */
-export function engageRange(unit: UnitState): number {
-  if (unit.attackRange > 140) return unit.attackRange;
-  const body =
-    ENEMY_BY_ID[unit.sourceId as EnemyId]?.kind === "boss" ? MELEE_CONTACT + 12 : MELEE_CONTACT;
-  return unit.attackRange + body;
+/** Stable combat footprint used by movement; rendering remains free to animate around it. */
+export function combatBodyRadius(unit: UnitState): number {
+  if (unit.team === "heroes") return HERO_BODY_RADIUS;
+  const kind = ENEMY_BY_ID[unit.sourceId as EnemyId]?.kind;
+  if (kind === "boss") return BOSS_ENEMY_BODY_RADIUS;
+  if (kind === "elite") return ELITE_ENEMY_BODY_RADIUS;
+  return NORMAL_ENEMY_BODY_RADIUS;
 }
 
-/** Soft same-team volume on X. unit.y is a stable DNF-style lane offset. */
-export function separateAllies(units: UnitState[], deltaMs: number): void {
-  const alive = units.filter(({ alive }) => alive);
-  const step = Math.min(1, deltaMs / 40);
+/** Full target silhouette used for projectile range without widening melee contact. */
+function projectileTargetRadius(unit: UnitState): number {
+  if (unit.team === "heroes") return HERO_PROJECTILE_RADIUS;
+  const kind = ENEMY_BY_ID[unit.sourceId as EnemyId]?.kind;
+  if (kind === "boss") return BOSS_ENEMY_PROJECTILE_RADIUS;
+  if (kind === "elite") return ELITE_ENEMY_PROJECTILE_RADIUS;
+  return NORMAL_ENEMY_PROJECTILE_RADIUS;
+}
 
-  for (let i = 0; i < alive.length; i += 1) {
-    for (let j = i + 1; j < alive.length; j += 1) {
-      const a = alive[i]!;
-      const b = alive[j]!;
-      if (a.team !== b.team) continue;
+/** Minimum center distance before opposing character models touch. */
+export function minimumOpponentGap(left: UnitState, right: UnitState): number {
+  return combatBodyRadius(left) + combatBodyRadius(right);
+}
 
-      // Planted fighters keep their feet still — shoving them reads as skating mid-attack.
-      const aPlanted = isPlantedForAttack(a, alive);
-      const bPlanted = isPlantedForAttack(b, alive);
-      if (aPlanted && bPlanted) continue;
-
-      const heroTeam = a.team === "heroes";
-      const minGap = heroTeam ? HERO_GAP : ENEMY_GAP;
-      const strength = heroTeam ? 0.75 : 0.55;
-      let dx = b.x - a.x;
-
-      if (Math.abs(dx) >= minGap) continue;
-
-      if (Math.abs(dx) < 0.001) {
-        if (a.attackRange !== b.attackRange) {
-          dx = a.attackRange > b.attackRange ? 1 : -1;
-        } else {
-          dx = a.id < b.id ? 1 : -1;
-        }
-      }
-
-      const overlap = (minGap - Math.abs(dx)) * strength * step * 0.55;
-      const dir = Math.sign(dx);
-      // Never shove someone farther from their foe — that parked backliners out of range.
-      if (!aPlanted) {
-        const move = -dir * overlap;
-        if (!increasesTargetDistance(a, move, alive)) a.x += move;
-      }
-      if (!bPlanted) {
-        const move = dir * overlap;
-        if (!increasesTargetDistance(b, move, alive)) b.x += move;
-      }
-    }
+/**
+ * Legal strike distance. Melee reach starts outside both combat footprints;
+ * ranged projectiles only need to reach the target footprint, not its center.
+ */
+export function engageRange(source: UnitState, target: UnitState): number {
+  if (source.attackMode === "ranged") {
+    return source.attackRange + RANGED_ATTACK_RANGE_BONUS + projectileTargetRadius(target);
   }
-}
-
-/** True when applying dx would move the unit farther from its current enemy. */
-function increasesTargetDistance(unit: UnitState, dx: number, units: readonly UnitState[]): boolean {
-  if (!unit.targetId || Math.abs(dx) < 0.001) return false;
-  const target = units.find(({ id, alive }) => id === unit.targetId && alive);
-  if (!target || target.team === unit.team) return false;
-  const before = Math.abs(target.x - unit.x);
-  const after = Math.abs(target.x - (unit.x + dx));
-  return after > before + 0.01;
-}
-
-/** Keep enemy and hero footprints from collapsing into one sprite pile. */
-export function separateOpponents(units: UnitState[], deltaMs: number): void {
-  const alive = units.filter(({ alive }) => alive);
-  const step = Math.min(1, deltaMs / 40);
-  for (let i = 0; i < alive.length; i += 1) {
-    for (let j = i + 1; j < alive.length; j += 1) {
-      const a = alive[i]!;
-      const b = alive[j]!;
-      if (a.team === b.team) continue;
-
-      const dx = Math.abs(b.x - a.x);
-      if (dx >= BODY_OVERLAP) continue;
-      if (isPlantedForAttack(a, alive) || isPlantedForAttack(b, alive)) continue;
-
-      const overlap = (BODY_OVERLAP - dx) * 0.85 * step;
-      const hero = a.team === "heroes" ? a : b;
-      const enemy = a.team === "enemies" ? a : b;
-      hero.x -= overlap;
-      enemy.x += overlap;
-    }
-  }
+  return minimumOpponentGap(source, target) + Math.max(MIN_MELEE_REACH, source.attackRange);
 }
 
 /** Stable 0–1 hash from an id string (not a neat sequence). */
@@ -157,13 +195,13 @@ export function unitNoise(id: string, salt = 0): number {
 }
 
 /** How far left of hold X a hero starts when marching in from off-screen. */
-export const HERO_ENTRY_OFFSET = 460;
+export const HERO_ENTRY_OFFSET = 620;
 /** Extra left spacing so later slots trail in sequence. */
-export const HERO_ENTRY_STAGGER_X = 72;
+export const HERO_ENTRY_STAGGER_X = 52;
 /** Delay before each slot begins marching in. */
 export const HERO_ENTRY_STAGGER_MS = 160;
 /** March-in speed toward formation hold X. */
-export const HERO_ENTRY_SPEED = 210;
+export const HERO_ENTRY_SPEED = 260;
 
 /** How far right of hold X an enemy starts when entering from off-screen. */
 export const ENEMY_ENTRY_OFFSET = 300;
@@ -171,19 +209,25 @@ export const ENEMY_ENTRY_OFFSET = 300;
 export const ENEMY_ENTRY_STAGGER_X = 78;
 /** Delay before each enemy slot begins marching in. */
 export const ENEMY_ENTRY_STAGGER_MS = 150;
-/** Enemy march-in speed toward formation hold X. */
-export const ENEMY_ENTRY_SPEED = 195;
-
 /**
  * DNF-style path lanes in screen px relative to the ground line.
  * Keep the band inside the walkable dirt road (not into trees / bottom FG).
  * Negative = farther up the path; positive = closer to the camera.
  */
-const HERO_LANE_Y = [-18, 14, -6, 28, 4] as const;
-const ENEMY_LANE_Y = [-14, 10, -4, 22, 16, 2] as const;
+const HERO_LANE_Y = [-52, 26, -26, 52, 0] as const;
+const ENEMY_LANE_Y = [-40, 24, -24, 40, 8, -8] as const;
+
+/** Stable authored lane shared by movement and presentation. */
+export function formationLane(
+  slotIndex: number,
+  team: "heroes" | "enemies" = "enemies",
+): number {
+  const laneCount = team === "heroes" ? HERO_LANE_Y.length : ENEMY_LANE_Y.length;
+  return Math.max(0, slotIndex) % laneCount;
+}
 
 /**
- * Stable lane Y for a unit. Spread is wide enough that 74px sprites do not merge.
+ * Stable lane Y for a unit. A small identity offset keeps the formation organic.
  */
 export function laneOffsetY(
   unitId: string,
@@ -191,8 +235,8 @@ export function laneOffsetY(
   team: "heroes" | "enemies" = "enemies",
 ): number {
   const table = team === "heroes" ? HERO_LANE_Y : ENEMY_LANE_Y;
-  const base = table[slotIndex % table.length] ?? (slotIndex - 2) * 16;
-  const jitter = (unitNoise(unitId, 11) - 0.5) * 10;
+  const base = table[formationLane(slotIndex, team)] ?? (slotIndex - 2) * 16;
+  const jitter = (unitNoise(unitId, 11) - 0.5) * (team === "heroes" ? 12 : 4);
   return base + jitter;
 }
 
@@ -212,11 +256,12 @@ export function heroFormationOffset(
   slotIndex: number,
   heroId: string,
 ): { x: number; y: number } {
-  const rank = attackRange >= 200 ? 0 : attackRange >= 120 ? 48 : 92;
-  const stagger = slotIndex * 28;
+  const rank = attackRange >= 200 ? 0 : attackRange >= 120 ? 56 : 112;
+  const tankLead = HERO_BY_ID[heroId as HeroId]?.expeditionRole === "tank" ? 28 : 0;
+  const stagger = (slotIndex % 2) * 14;
   const jitter = (unitNoise(heroId, 3) - 0.5) * 14;
   return {
-    x: 70 + rank + stagger + jitter,
+    x: 82 + rank + tankLead + stagger + jitter,
     y: laneOffsetY(`hero-${slotIndex}-${heroId}`, slotIndex, "heroes"),
   };
 }

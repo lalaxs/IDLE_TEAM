@@ -4,6 +4,7 @@ import {
   type ChapterId,
   STAGES_PER_CHAPTER,
 } from "./chapters";
+import { bossNameForStage } from "./enemies";
 
 export interface StageDefinition {
   id: string;
@@ -14,6 +15,8 @@ export interface StageDefinition {
   environment: "meadow" | "forest" | "ruins";
   bossName: string;
 }
+
+export const STAGE_GIFT_STARSTONE_REWARD = 20;
 
 const STAGE_NAMES: Record<ChapterId, readonly string[]> = {
   1: [
@@ -61,15 +64,18 @@ const STAGE_NAMES: Record<ChapterId, readonly string[]> = {
 function buildChapter(chapter: ChapterId): StageDefinition[] {
   const meta = CHAPTER_BY_ID[chapter];
   const names = STAGE_NAMES[chapter];
-  return names.map((name, index) => ({
-    id: `${chapter}-${index + 1}`,
-    stage: (chapter - 1) * STAGES_PER_CHAPTER + index + 1,
-    name,
-    chapter,
-    chapterName: meta.name,
-    environment: index < 4 ? "meadow" : index < 8 ? "forest" : "ruins",
-    bossName: meta.bossName,
-  }));
+  return names.map((name, index) => {
+    const stage = (chapter - 1) * STAGES_PER_CHAPTER + index + 1;
+    return {
+      id: `${chapter}-${index + 1}`,
+      stage,
+      name,
+      chapter,
+      chapterName: meta.name,
+      environment: index < 4 ? "meadow" : index < 8 ? "forest" : "ruins",
+      bossName: bossNameForStage(stage),
+    };
+  });
 }
 
 export const STAGE_DEFINITIONS: readonly StageDefinition[] = CHAPTER_DEFINITIONS.flatMap((chapter) =>

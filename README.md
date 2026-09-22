@@ -57,5 +57,4 @@ npx playwright install chromium
 - `tests`：规则、集成、UI、资产和多尺寸浏览器测试。
 
 完整产品与技术规格见 [设计规格](docs/superpowers/specs/2026-07-31-mature-mobile-h5-demo-design.md)，
-装备词条对标见 [暗黑不朽对照规格](docs/superpowers/specs/2026-08-10-equipment-affix-diablo-immortal-design.md)，
-实施任务见 [实施计划](docs/superpowers/plans/2026-07-31-mature-mobile-h5-demo-implementation.md)。
+装备词条对标见 [暗黑不朽对照规格](docs/superpowers/specs/2026-08-10-equipment-affix-diablo-immortal-design.md)。

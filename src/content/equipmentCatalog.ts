@@ -1,5 +1,4 @@
 import type { ChapterId } from "./chapters";
-import { svgEquipmentIcon } from "./equipmentIcon";
 import type { DamageSchool } from "./equipmentIcon";
 import type { SetId } from "./sets";
 import type { EquipmentSlot } from "./equipmentSlots";
@@ -18,7 +17,7 @@ export interface CatalogItemSeed {
   minGrade: Rarity;
   maxGrade: Rarity;
   setId?: SetId;
-  /** Prefer existing webp when present; otherwise SVG placeholder. */
+  /** Runtime equipment icon asset. */
   icon?: string;
   /** Legacy chapter field for pool / UI grouping. */
   chapter: ChapterId;
@@ -253,7 +252,7 @@ function buildLaterChapterItems(): CatalogItemSeed[] {
           minGrade: grades.minGrade,
           maxGrade: grades.maxGrade,
           chapter,
-          icon: svgEquipmentIcon(id, slot, school),
+          icon: `/assets/equipment/${id}.webp`,
         });
       }
     }
@@ -299,7 +298,7 @@ function buildSetPieces(): CatalogItemSeed[] {
         maxGrade: grades.maxGrade,
         setId: config.setId,
         chapter: config.chapter,
-        icon: svgEquipmentIcon(id, slot, config.school),
+        icon: `/assets/equipment/${id}.webp`,
       });
     }
   }

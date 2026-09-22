@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 
 const chapters = [
@@ -13,8 +13,6 @@ const outBg = "public/assets/backgrounds/stages";
 const outFg = "public/assets/backgrounds/foreground";
 await mkdir(outBg, { recursive: true });
 await mkdir(outFg, { recursive: true });
-
-const manifest = { stages: {}, foregrounds: {} };
 
 for (const ch of chapters) {
   const masterDir = path.join("docs/art/generated/backgrounds", ch.dir, "masters");
@@ -30,7 +28,6 @@ for (const ch of chapters) {
       .resize(860, 484, { fit: "fill" })
       .webp({ quality: 78, effort: 4 })
       .toFile(path.join(outBg, outName));
-    manifest.stages[key] = `/assets/backgrounds/stages/${outName}`;
     console.log("bg", outName);
   }
 
@@ -42,13 +39,8 @@ for (const ch of chapters) {
       .resize(860, 484, { fit: "fill" })
       .webp({ quality: 80, alphaQuality: 90, effort: 4 })
       .toFile(path.join(outFg, outName));
-    manifest.foregrounds[key] = `/assets/backgrounds/foreground/${outName}`;
     console.log("fg", outName);
   }
 }
 
-await writeFile(
-  "public/assets/backgrounds/runtime-manifest.json",
-  `${JSON.stringify(manifest, null, 2)}\n`,
-);
-console.log("done", Object.keys(manifest.stages).length, Object.keys(manifest.foregrounds).length);
+console.log("done");

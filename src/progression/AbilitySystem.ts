@@ -34,8 +34,11 @@ export function normalizeAbilityLevels(raw: unknown): AbilityLevels {
 }
 
 /** Gold cost to raise an ability from `level` to `level + 1`. */
-export function getAbilityUpgradeCost(level: number): number {
-  return Math.round(ABILITY_UPGRADE_COST_BASE * ABILITY_UPGRADE_COST_GROWTH ** Math.max(0, level));
+export function getAbilityUpgradeCost(abilityId: AbilityId, level: number): number {
+  const definition = ABILITY_BY_ID[abilityId];
+  const base = definition.upgradeCostBase ?? ABILITY_UPGRADE_COST_BASE;
+  const growth = definition.upgradeCostGrowth ?? ABILITY_UPGRADE_COST_GROWTH;
+  return Math.round(base * growth ** Math.max(0, level));
 }
 
 export function getAbilityEffectValue(abilityId: AbilityId, level: number): number {
@@ -47,7 +50,7 @@ export function getAbilityEffectValue(abilityId: AbilityId, level: number): numb
 export function describeAbilityEffect(abilityId: AbilityId, level: number): string {
   const definition = ABILITY_BY_ID[abilityId];
   const value = getAbilityEffectValue(abilityId, level);
-  const pretty = Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+  const pretty = Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
   if (definition.unit === "percent") return `当前 +${pretty}%`;
   return `当前 +${pretty}`;
 }
@@ -103,8 +106,8 @@ export function applyCombatAbilityBonus(bonus: HeroBattleBonus, levels: AbilityL
   const next = { ...bonus };
   next.attack = (next.attack ?? 0) + getAbilityEffectValue("hero_attack", levels.hero_attack);
   next.defense = (next.defense ?? 0) + getAbilityEffectValue("hero_defense", levels.hero_defense);
-  next.skillCooldownPct =
-    (next.skillCooldownPct ?? 0) + getAbilityEffectValue("hero_cooldown", levels.hero_cooldown) / 100;
+  next.rageGainPct =
+    (next.rageGainPct ?? 0) + getAbilityEffectValue("hero_cooldown", levels.hero_cooldown) / 100;
   next.attackSpeedPct =
     (next.attackSpeedPct ?? 0) + getAbilityEffectValue("hero_attack_speed", levels.hero_attack_speed);
   next.physicalDamagePct =
@@ -125,7 +128,7 @@ export function abilityCardMeta(abilityId: AbilityId, level: number) {
     level,
     atMax,
     effectText: describeAbilityEffect(abilityId, level),
-    nextCost: atMax ? null : getAbilityUpgradeCost(level),
+    nextCost: atMax ? null : getAbilityUpgradeCost(abilityId, level),
   };
 }
 

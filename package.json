@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node scripts/build-sites.mjs",
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "build": "npm run typecheck && vite build && node scripts/build-sites.mjs",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify": "npm run typecheck:test && npm run test:run && npm run build"
   },
   "dependencies": {
     "phaser": "3.90.0"

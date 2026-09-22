@@ -30,8 +30,13 @@ def validate_master_image(path: Path) -> list[str]:
             return errors
 
         left, top, right, bottom = bbox
-        if left <= 0 or top <= 0 or right >= image.width or bottom >= image.height:
-            errors.append("subject must not touch the canvas edge")
+        if (
+            left < 32
+            or top < 32
+            or right > image.width - 32
+            or bottom > image.height - 32
+        ):
+            errors.append("subject must keep at least 32px canvas safety padding")
 
         corners = (
             alpha.getpixel((0, 0)),
@@ -42,9 +47,26 @@ def validate_master_image(path: Path) -> list[str]:
         if any(corner != 0 for corner in corners):
             errors.append("all four corners must be transparent")
 
-        subject_height_ratio = (bottom - top) / image.height
-        if not 0.68 <= subject_height_ratio <= 0.84:
-            errors.append("subject height must cover 68%–84% of the canvas")
+        body_bbox_text = image.info.get("hero_body_bbox")
+        if body_bbox_text is None:
+            errors.append("master must include hero_body_bbox metadata")
+        else:
+            try:
+                body_bbox = tuple(json.loads(body_bbox_text))
+                body_left, body_top, body_right, body_bottom = body_bbox
+            except (TypeError, ValueError, json.JSONDecodeError):
+                errors.append("hero_body_bbox metadata must contain four integers")
+            else:
+                if len(body_bbox) != 4 or not all(
+                    isinstance(value, int) for value in body_bbox
+                ):
+                    errors.append("hero_body_bbox metadata must contain four integers")
+                elif body_bottom - body_top != 760:
+                    errors.append("hero body height must be 760px")
+                elif (body_left + body_right) // 2 != 512:
+                    errors.append("hero body must be horizontally centered at x=512")
+                elif body_bottom != 930:
+                    errors.append("hero body baseline must be y=930")
 
     return errors
 

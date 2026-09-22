@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -78,7 +79,9 @@ class AssetValidatorTests(unittest.TestCase):
             for x in range(280, 744):
                 for y in range(160, 864):
                     image.putpixel((x, y), (20, 20, 20, 255))
-            image.save(path)
+            metadata = PngInfo()
+            metadata.add_text("hero_body_bbox", "[312, 170, 712, 930]")
+            image.save(path, pnginfo=metadata)
 
             errors = self.validator.validate_master_image(path)
 
@@ -104,7 +107,22 @@ class AssetValidatorTests(unittest.TestCase):
 
             errors = self.validator.validate_master_image(path)
 
-            self.assertIn("subject must not touch the canvas edge", errors)
+            self.assertIn("subject must keep at least 32px canvas safety padding", errors)
+
+    def test_master_with_wrong_body_scale_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "wrong-body-scale.png"
+            image = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+            for x in range(280, 744):
+                for y in range(160, 864):
+                    image.putpixel((x, y), (20, 20, 20, 255))
+            metadata = PngInfo()
+            metadata.add_text("hero_body_bbox", "[312, 190, 712, 930]")
+            image.save(path, pnginfo=metadata)
+
+            errors = self.validator.validate_master_image(path)
+
+            self.assertIn("hero body height must be 760px", errors)
 
     def test_wrong_size_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -1,14 +1,28 @@
 import type { StatusInstance, UnitState } from "./types";
 
+function statusIdentity(status: StatusInstance): string {
+  return status.effectId ?? status.kind;
+}
+
 export function applyStatus(unit: UnitState, incoming: StatusInstance): void {
-  const existing = unit.statuses.find(({ kind }) => kind === incoming.kind);
+  const identity = statusIdentity(incoming);
+  const existing = unit.statuses.find(
+    (status) => status.kind === incoming.kind
+      && status.sourceId === incoming.sourceId
+      && statusIdentity(status) === identity,
+  );
   if (!existing) {
     unit.statuses.push({ ...incoming });
     return;
   }
-  existing.magnitude = Math.max(existing.magnitude, incoming.magnitude);
-  existing.remainingMs = Math.max(existing.remainingMs, incoming.remainingMs);
-  if (incoming.magnitude >= existing.magnitude) existing.sourceId = incoming.sourceId;
+  if (incoming.magnitude > existing.magnitude) {
+    existing.magnitude = incoming.magnitude;
+    existing.remainingMs = incoming.remainingMs;
+    return;
+  }
+  if (incoming.magnitude === existing.magnitude) {
+    existing.remainingMs = Math.max(existing.remainingMs, incoming.remainingMs);
+  }
 }
 
 export function advanceStatuses(unit: UnitState, deltaMs: number): void {
@@ -17,7 +31,10 @@ export function advanceStatuses(unit: UnitState, deltaMs: number): void {
 }
 
 export function getStatusMagnitude(unit: UnitState, kind: StatusInstance["kind"]): number {
-  return unit.statuses.find((status) => status.kind === kind)?.magnitude ?? 0;
+  return unit.statuses.reduce(
+    (strongest, status) => status.kind === kind ? Math.max(strongest, status.magnitude) : strongest,
+    0,
+  );
 }
 
 export const isStunned = (unit: UnitState): boolean =>

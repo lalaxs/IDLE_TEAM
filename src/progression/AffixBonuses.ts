@@ -19,6 +19,9 @@ function applyAffixRoll(roll: AffixRoll, bonus: HeroBattleBonus): void {
     case "attack_speed":
       bonus.attackSpeedPct = (bonus.attackSpeedPct ?? 0) + roll.value;
       break;
+    case "cast_speed":
+      bonus.castSpeedPct = (bonus.castSpeedPct ?? 0) + roll.value;
+      break;
     case "damage_pct":
       bonus.damagePct = (bonus.damagePct ?? 0) + roll.value / 100;
       break;
@@ -35,7 +38,7 @@ function applyAffixRoll(roll: AffixRoll, bonus: HeroBattleBonus): void {
       bonus.skillDamagePct = (bonus.skillDamagePct ?? 0) + roll.value / 100;
       break;
     case "cooldown_reduction":
-      bonus.skillCooldownPct = (bonus.skillCooldownPct ?? 0) + roll.value / 100;
+      bonus.rageGainPct = (bonus.rageGainPct ?? 0) + roll.value / 100;
       break;
     case "damage_reduction":
       bonus.damageReductionPct = (bonus.damageReductionPct ?? 0) + roll.value / 100;

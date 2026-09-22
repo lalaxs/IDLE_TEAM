@@ -1,15 +1,17 @@
 import "./styles/theme.css";
 import "./styles/layout.css";
 import "./styles/components.css";
+import "./styles/check-in.css";
 import { GameApp } from "./app/GameApp";
 import { mountViewportFit } from "./ui/viewportFit";
 
 const stage = document.querySelector<HTMLElement>("#fit-stage")!;
 const root = document.querySelector<HTMLElement>("#app")!;
-mountViewportFit(stage, root);
+const unmountViewportFit = mountViewportFit(stage, root);
+let app: GameApp | null = null;
 
 try {
-  new GameApp(root);
+  app = new GameApp(root);
 } catch (error) {
   console.error("Game failed to start", error);
   root.innerHTML = `
@@ -20,4 +22,11 @@ try {
       <button onclick="location.reload()">重新载入</button>
     </section>
   `;
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    app?.destroy();
+    unmountViewportFit();
+  });
 }

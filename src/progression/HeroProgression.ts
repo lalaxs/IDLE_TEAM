@@ -4,21 +4,29 @@ import {
   HERO_DEF_PER_LEVEL,
   HERO_HP_PER_LEVEL,
   HERO_LEVELS_PER_ASCEND,
-  HERO_UPGRADE_COST_BASE,
-  HERO_UPGRADE_COST_GROWTH,
   MAX_HERO_LEVEL,
 } from "../content/balance";
 import type { HeroId } from "../simulation/types";
+import { heroUpgradeExperience } from "../content/numericalModel";
 
-export const getUpgradeCost = (level: number): number =>
-  Math.round(HERO_UPGRADE_COST_BASE * HERO_UPGRADE_COST_GROWTH ** (level - 1));
+export const getUpgradeCost = heroUpgradeExperience;
 
-/** Fragment costs to raise star rank from current stars → stars+1. */
-export const HERO_STAR_UPGRADE_COST = [20, 40, 80, 120, 200] as const;
+export function getHeroExperienceRemaining(level: number, experience: number): number {
+  return Math.max(0, getUpgradeCost(level) - Math.max(0, Math.floor(experience)));
+}
+
+/** Fragment costs for silver 1–5, gold 1–5, then rainbow 1–5. */
+export const HERO_STAR_UPGRADE_COST = [
+  1, 2, 3, 4, 5,
+  5, 6, 6, 7, 7,
+  8, 8, 9, 9, 10,
+] as const;
+export const HERO_STARS_PER_PHASE = 5;
+export const HERO_STAR_PHASES = ["silver", "gold", "rainbow"] as const;
+export type HeroStarPhase = (typeof HERO_STAR_PHASES)[number];
 export const MAX_HERO_STARS = HERO_STAR_UPGRADE_COST.length;
-export const STAR_FLAT_LEVELS = 5;
-export const STAR_SKILL_DAMAGE_PER_STAR = 0.06;
-export const STAR_SKILL_COOLDOWN_AT_FIVE = 0.08;
+export const STAR_SKILL_EFFECT_PER_PHASE_STAR = [0.02, 0.03, 0.04] as const;
+export const STAR_RAGE_GAIN_BY_PHASE = [0.03, 0.06, 0.1] as const;
 
 /** Ascend-stone costs for rank 0→1 … 4→5. */
 export const HERO_ASCEND_STONE_COST = [1, 2, 3, 5, 8] as const;
@@ -29,9 +37,7 @@ export const ASCEND_STAT_RANK_4 = 0.15;
 export const ASCEND_STAT_RANK_5 = 0.25;
 
 export interface HeroStatGrowth {
-  starFlatHp?: number;
-  starFlatAtk?: number;
-  starFlatDef?: number;
+  stars?: number;
   ascendLevel?: number;
 }
 
@@ -40,20 +46,34 @@ export function getHeroLevelCap(ascendLevel: number): number {
   return Math.min(MAX_HERO_LEVEL, HERO_LEVELS_PER_ASCEND * (rank + 1));
 }
 
-export const getStarUpgradeCost = (stars: number, ascendLevel = 0): number | null => {
+export const getStarUpgradeCost = (stars: number): number | null => {
   if (stars < 0 || stars >= MAX_HERO_STARS) return null;
-  const base = HERO_STAR_UPGRADE_COST[stars]!;
-  return Math.round(base * (1 + 0.4 * Math.max(0, ascendLevel)));
+  return HERO_STAR_UPGRADE_COST[Math.floor(stars)]!;
 };
+
+export function getHeroStarPhase(stars: number): { phase: HeroStarPhase; count: number } {
+  const normalized = Math.max(0, Math.min(MAX_HERO_STARS, Math.floor(stars)));
+  if (normalized <= HERO_STARS_PER_PHASE) return { phase: "silver", count: normalized };
+  if (normalized <= HERO_STARS_PER_PHASE * 2) {
+    return { phase: "gold", count: normalized - HERO_STARS_PER_PHASE };
+  }
+  return { phase: "rainbow", count: normalized - HERO_STARS_PER_PHASE * 2 };
+}
+
+export function getHeroStarRankLabel(stars: number): string {
+  const { phase, count } = getHeroStarPhase(stars);
+  if (count === 0) return "无星";
+  const label = phase === "silver" ? "银星" : phase === "gold" ? "金星" : "彩星";
+  return `${label} ${count}/${HERO_STARS_PER_PHASE}`;
+}
 
 export const getAscendStoneCost = (ascendLevel: number): number | null => {
   if (ascendLevel < 0 || ascendLevel >= MAX_HERO_ASCEND_LEVEL) return null;
   return HERO_ASCEND_STONE_COST[ascendLevel]!;
 };
 
-export function canAscendHero(stars: number, ascendLevel: number, level = 0): boolean {
+export function canAscendHero(ascendLevel: number, level: number): boolean {
   return (
-    stars >= MAX_HERO_STARS &&
     ascendLevel < MAX_HERO_ASCEND_LEVEL &&
     level >= getHeroLevelCap(ascendLevel)
   );
@@ -75,12 +95,20 @@ export function getAscendStatPct(ascendLevel: number): number {
   return pct;
 }
 
-export function getStarSkillDamagePct(stars: number): number {
-  return Math.max(0, Math.min(MAX_HERO_STARS, stars)) * STAR_SKILL_DAMAGE_PER_STAR;
+export function getStarSkillEffectPct(stars: number): number {
+  const normalized = Math.max(0, Math.min(MAX_HERO_STARS, Math.floor(stars)));
+  return HERO_STAR_PHASES.reduce((total, _phase, index) => {
+    const count = Math.max(0, Math.min(HERO_STARS_PER_PHASE, normalized - index * HERO_STARS_PER_PHASE));
+    return total + count * STAR_SKILL_EFFECT_PER_PHASE_STAR[index]!;
+  }, 0);
 }
 
-export function getStarSkillCooldownPct(stars: number): number {
-  return stars >= MAX_HERO_STARS ? STAR_SKILL_COOLDOWN_AT_FIVE : 0;
+export function getStarRageGainPct(stars: number): number {
+  const completedPhases = Math.min(
+    HERO_STAR_PHASES.length,
+    Math.floor(Math.max(0, stars) / HERO_STARS_PER_PHASE),
+  );
+  return completedPhases > 0 ? STAR_RAGE_GAIN_BY_PHASE[completedPhases - 1]! : 0;
 }
 
 export function getHeroLevelStats(heroId: HeroId, level: number) {
@@ -93,36 +121,23 @@ export function getHeroLevelStats(heroId: HeroId, level: number) {
   };
 }
 
-export function getStarFlatDelta(heroId: HeroId, level: number) {
-  const now = getHeroLevelStats(heroId, Math.max(1, level));
-  const next = getHeroLevelStats(heroId, Math.max(1, level) + 1);
-  return {
-    maxHp: STAR_FLAT_LEVELS * (next.maxHp - now.maxHp),
-    attack: STAR_FLAT_LEVELS * (next.attack - now.attack),
-    defense: STAR_FLAT_LEVELS * (next.defense - now.defense),
-  };
-}
-
 export function getHeroStats(heroId: HeroId, level: number, growth: HeroStatGrowth = {}) {
-  const base = getHeroLevelStats(heroId, level);
-  const pct = getAscendStatPct(growth.ascendLevel ?? 0);
+  const base = HERO_BY_ID[heroId];
+  const index = Math.max(0, level - 1);
+  const ascendPct = getAscendStatPct(growth.ascendLevel ?? 0);
   return {
-    maxHp: Math.round((base.maxHp + (growth.starFlatHp ?? 0)) * (1 + pct)),
-    attack: Math.round((base.attack + (growth.starFlatAtk ?? 0)) * (1 + pct)),
-    defense: Math.round((base.defense + (growth.starFlatDef ?? 0)) * (1 + pct)),
+    maxHp: Math.round(base.maxHp * HERO_HP_PER_LEVEL ** index * (1 + ascendPct)),
+    attack: Math.round(base.attack * HERO_ATK_PER_LEVEL ** index * (1 + ascendPct)),
+    defense: Math.round(base.defense * HERO_DEF_PER_LEVEL ** index * (1 + ascendPct)),
   };
 }
 
 export function heroGrowthFromProgress(progress: {
-  starFlatHp?: number;
-  starFlatAtk?: number;
-  starFlatDef?: number;
+  stars?: number;
   ascendLevel?: number;
 }): HeroStatGrowth {
   return {
-    starFlatHp: progress.starFlatHp ?? 0,
-    starFlatAtk: progress.starFlatAtk ?? 0,
-    starFlatDef: progress.starFlatDef ?? 0,
+    stars: progress.stars ?? 0,
     ascendLevel: progress.ascendLevel ?? 0,
   };
 }

@@ -1,0 +1,61 @@
+{
+  "version": "1.1",
+  "region": {
+    "id": "qingqiu_ruins",
+    "name": "青丘林地·古碑遗迹",
+    "stages": ["1-9", "1-10", "1-11", "1-12"],
+    "palette": ["苍白木色", "暗蓝灰旧铜", "灰绿锈色", "冷灰旧石", "雾蓝", "低亮度琥珀", "深橄榄棕描边"]
+  },
+  "style_references": [
+    "docs/art/references/hero-style-master-v1.png",
+    "public/assets/characters/enemy-e01.png",
+    "public/assets/characters/enemy-e08.png"
+  ],
+  "monsters": [
+    {
+      "id": "E09",
+      "type": "normal",
+      "name": "雾松灵",
+      "slug": "mist-pine-spirit",
+      "role": "均衡近战",
+      "visual_anchors": ["收尖的苍白松果身体", "单簇后掠松针冠"],
+      "runtime_file": "public/assets/characters/enemy-e09.png"
+    },
+    {
+      "id": "E10",
+      "type": "normal",
+      "name": "缚藤兽",
+      "slug": "vine-bound-beast",
+      "role": "突进与短时束缚",
+      "visual_anchors": ["低伏灰木四足兽体", "交叉覆盖背部的两条粗藤带"],
+      "runtime_file": "public/assets/characters/enemy-e10.png"
+    },
+    {
+      "id": "E11",
+      "type": "normal",
+      "name": "碎碑傀",
+      "slug": "broken-stele-golem",
+      "role": "高防前排",
+      "visual_anchors": ["上下错位的圆角残碑身体", "短而沉重的石拳"],
+      "runtime_file": "public/assets/characters/enemy-e11.png"
+    },
+    {
+      "id": "E12",
+      "type": "elite",
+      "name": "雾钟灵",
+      "slug": "fog-bell-spirit",
+      "role": "回声护体与前排压制",
+      "visual_anchors": ["宽口钟形一体躯干", "断裂顶环", "圆形钟舌"],
+      "runtime_file": "public/assets/characters/enemy-e12.png"
+    },
+    {
+      "id": "B12",
+      "type": "boss",
+      "name": "碑翼古鸮",
+      "slug": "stelewing-ancient-owl",
+      "role": "翼压重击与低血狂暴",
+      "visual_anchors": ["圆头梨形宽鸮体", "垂落盾形宽翼", "三片碑形羽冠", "一体无字旧石领"],
+      "runtime_file": "public/assets/characters/enemy-b12.png"
+    }
+  ]
+}

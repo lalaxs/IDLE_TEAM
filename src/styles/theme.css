@@ -1,19 +1,92 @@
+@font-face {
+  font-family: "Qingqiu Round";
+  src: url("/assets/fonts/qingqiu-round-bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Changa One";
+  src: url("/assets/fonts/changa-one-regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
-  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --ink: #3a302b;
-  --ink-soft: #65554c;
-  --cream: #f7efd9;
-  --paper: #e5dac3;
-  --coral: #d96f5f;
-  --green: #7f9b63;
-  --green-dark: #506f51;
-  --green-light: #c7d9aa;
-  --blue: #78add6;
-  --yellow: #f1c85d;
-  --purple: #a96fd0;
-  --panel-radius: 14px;
+  --game-font-family: "Qingqiu Round", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --combat-font-family: "Changa One", "Qingqiu Round", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --game-font-weight: 700;
+  font-family: var(--game-font-family);
+  font-weight: var(--game-font-weight);
+  font-synthesis: none;
+  --ink: #45372e;
+  --ink-soft: #75614f;
+  --cream: #ece5d3;
+  --paper: #d8bd90;
+  --coral: #df645b;
+  --green: #8fbc61;
+  --green-dark: #486b36;
+  --green-light: #c7dda4;
+  --blue: #587c9f;
+  --yellow: #f3d765;
+  --purple: #9b70bf;
+  --panel-radius: 18px;
   --outline: 3px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-6: 24px;
+  --ui-touch: 44px;
+  --ui-touch-primary: 48px;
+  --ui-control-compact: 36px;
+  --ui-control-hud: 36px;
+  --ui-control-standard: 40px;
+  --ui-control-primary: 44px;
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 12px;
+  --ui-radius-lg: 16px;
+  --ui-surface-dark: #30343f;
+  --ui-surface-dark-strong: #20232a;
+  --ui-border-dark: #555c6b;
+  --ui-border-light: #af9879;
+  --ui-track: #20232a;
+  --ui-outline: #24262d;
+  --ui-paper-raised: #fff7e3;
+  --ui-text-light: #fff9e9;
+  --ui-text-muted-light: #c5c9d1;
+  --ui-selected: #ddae98;
+  --ui-disabled: #656a75;
+  --ui-scrim: rgb(18 21 27 / 62%);
+  --ui-control-border-width: 2px;
+  --ui-control-border: var(--ui-control-border-width) solid var(--ui-outline);
+  --ui-border: 2px solid var(--ui-outline);
+  --ui-border-strong: 3px solid var(--ui-outline);
+  --ui-bevel: inset 0 2px 0 rgb(255 255 255 / 32%), inset 0 -3px 0 rgb(25 27 32 / 24%);
+  --ui-panel-shadow: inset 0 2px 0 rgb(255 255 255 / 18%), 0 3px 0 rgb(16 18 24 / 40%);
+  --ui-button-shadow: var(--ui-bevel), 0 2px 0 var(--ui-outline);
+  --ui-text-outline-width: 3px;
+  --ui-text-outline: var(--ui-text-outline-width) var(--ui-outline);
+  --ui-font-title: 22px;
+  --ui-font-heading: 18px;
+  --ui-font-action: 16px;
+  --ui-font-body: 14px;
+  --ui-font-small: 12px;
+  --ui-motion-fast: 120ms;
+  --ui-z-hud: 10;
+  --rarity-bg-common: #8895b0;
+  --rarity-bg-uncommon: #719564;
+  --rarity-bg-rare: #597fa4;
+  --rarity-bg-epic: #b79755;
+  --rarity-bg-immortal: #b97168;
+  --rarity-bg-arcane: #85649f;
+  --rarity-bg-transcendent: #b57293;
+  --rarity-bg-astral: #639dab;
+  --rarity-bg-sacred: #bdac59;
+  --rarity-bg-primordial: #a696b9;
 }
 
 * {
@@ -26,8 +99,11 @@ body {
   margin: 0;
   min-height: 100%;
   overflow-x: hidden;
-  background: #27362f;
+  background: #191c23;
   color: var(--ink);
+  font-size: var(--ui-font-body);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 
 button,

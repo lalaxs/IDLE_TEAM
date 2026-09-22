@@ -43,43 +43,48 @@ body {
 }
 
 .game-shell {
+  --topbar-height: calc(42px + env(safe-area-inset-top));
+  --battle-stage-height: clamp(248px, 31cqh, 284px);
   position: relative;
   width: 100%;
   height: 100%;
   min-height: 100%;
-  background: var(--cream);
+  background: var(--ui-surface-dark);
   overflow: hidden;
   container-type: size;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows:
-    calc(54px + env(safe-area-inset-top))
-    clamp(228px, 35cqh, 308px)
-    68px
+    var(--topbar-height)
+    var(--battle-stage-height)
+    72px
     minmax(0, 1fr)
-    calc(66px + env(safe-area-inset-bottom));
+    calc(76px + env(safe-area-inset-bottom));
 }
 
 .game-shell > .topbar { grid-column: 1; grid-row: 1; }
-.game-shell > .battle-frame { grid-column: 1; grid-row: 2; }
+.game-shell > .battle-frame { grid-column: 1; grid-row: 1 / 3; }
 .game-shell > .party-strip { grid-column: 1; grid-row: 3; }
 .game-shell:has(.alchemy-tips-host:not(:empty)) > .party-strip {
   /* Floating tips cover the party strip while previewing. */
   visibility: hidden;
+  pointer-events: none;
 }
 .game-shell > .alchemy-tips-host {
-  /* Same cell as party-strip; full-width band extends into content (annotated frame). */
+  /* Span battle + party rows; sit on the party band and grow upward. */
   grid-column: 1;
-  grid-row: 3;
+  grid-row: 2 / 4;
   z-index: 14;
   position: relative;
-  align-self: start;
+  align-self: end;
   justify-self: stretch;
   width: 100%;
   min-width: 0;
-  height: calc(100% + 120px);
-  margin: 0 0 -120px;
-  overflow: hidden;
+  height: auto;
+  max-height: min(210px, 48cqh);
+  margin: 0;
+  padding: 0 6px 4px;
+  overflow: visible;
   pointer-events: none;
 }
 
@@ -91,6 +96,38 @@ body {
 .game-shell > .overlay-layer {
   grid-column: 1;
   grid-row: 1 / -1;
+}
+
+.game-shell > .overlay-layer > .equipment-global-tips-host {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.game-shell > .overlay-layer > .equipment-global-tips-host:empty {
+  display: none;
+}
+
+.game-shell > .overlay-layer > .equipment-global-tips-host:has(.growth-material-tips-layer) {
+  z-index: 2;
+}
+
+.game-shell > .overlay-layer > .equipment-global-tips-host:has(.loot-chest-equipment-tips-layer) {
+  z-index: 41;
+}
+
+.game-shell > .overlay-layer > .resource-flyout-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.game-shell > .overlay-layer > .toast-stack {
+  top: calc(var(--topbar-height) + var(--battle-stage-height) - 26px);
 }
 
 #battle-canvas {
@@ -133,7 +170,9 @@ body {
   gap: 8px;
   background: linear-gradient(#aac8c2, #d9e4c3 58%, #879c6f);
   color: #fffaf0;
-  text-shadow: 0 2px 0 #4a5b4c;
+  -webkit-text-stroke: var(--ui-text-outline);
+  paint-order: stroke fill;
+  text-shadow: none;
 }
 
 .boot-emblem {
@@ -160,12 +199,13 @@ body {
 
 @supports not (container-type: size) {
   .game-shell {
+    --battle-stage-height: clamp(248px, 31%, 284px);
     grid-template-rows:
-      calc(54px + env(safe-area-inset-top))
-      clamp(228px, 35%, 308px)
-      68px
+      var(--topbar-height)
+      var(--battle-stage-height)
+      72px
       minmax(0, 1fr)
-      calc(66px + env(safe-area-inset-bottom));
+      calc(76px + env(safe-area-inset-bottom));
   }
 }
 
@@ -178,7 +218,7 @@ body {
     display: grid;
     place-items: center;
     padding: 32px;
-    background: #27362f;
+    background: var(--ui-surface-dark-strong);
     color: #fff;
     text-align: center;
     font-size: 18px;

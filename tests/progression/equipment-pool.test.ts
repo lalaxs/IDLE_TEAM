@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  getFrostlandWeight,
-  getRegionalEquipmentWeight,
+  getChapterEquipmentDropPool,
+  getEquipmentDropChapters,
+  getStageEquipmentDropPool,
   selectEquipmentDefinition,
 } from "../../src/progression/EquipmentPool";
+import { ITEM_BY_ID } from "../../src/content/items";
 import type { RandomSource } from "../../src/simulation/RandomSource";
 
 class FixedRandom implements RandomSource {
@@ -23,71 +25,38 @@ class FixedRandom implements RandomSource {
 }
 
 describe("chapter equipment pool", () => {
-  it("uses the approved Frostland thresholds", () => {
-    expect([
-      getFrostlandWeight(12),
-      getFrostlandWeight(13),
-      getFrostlandWeight(16),
-      getFrostlandWeight(17),
-      getFrostlandWeight(20),
-      getFrostlandWeight(21),
-      getFrostlandWeight(24),
-    ]).toEqual([0, 0.35, 0.35, 0.6, 0.6, 0.8, 0.8]);
-  });
-
   it("never selects Frostland gear in chapter one", () => {
     expect(selectEquipmentDefinition(12, new FixedRandom(0)).chapter).toBe(1);
   });
 
-  it("selects either chapter pool around each stage threshold", () => {
-    // Ch2: T1 boards are retired, so both rolls stay in chapter-2 window.
-    expect(selectEquipmentDefinition(13, new FixedRandom(0.34)).chapter).toBe(2);
-    expect(selectEquipmentDefinition(13, new FixedRandom(0.35)).chapter).toBe(2);
-    expect(selectEquipmentDefinition(17, new FixedRandom(0.59)).chapter).toBe(2);
-    expect(selectEquipmentDefinition(17, new FixedRandom(0.6)).chapter).toBe(2);
-    expect(selectEquipmentDefinition(21, new FixedRandom(0.79)).chapter).toBe(2);
-    expect(selectEquipmentDefinition(21, new FixedRandom(0.8)).chapter).toBe(2);
+  it("keeps every chapter pool exclusive to that chapter", () => {
+    for (const chapter of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const) {
+      const pool = getChapterEquipmentDropPool(chapter);
+      expect(pool.length).toBeGreaterThan(0);
+      expect(new Set(pool.map((item) => item.chapter))).toEqual(new Set([chapter]));
+      expect(pool.some((item) => item.id.startsWith("set_"))).toBe(false);
+    }
   });
 
-  it("repeats the approved regional thresholds in Red Sands", () => {
-    expect([
-      getRegionalEquipmentWeight(24),
-      getRegionalEquipmentWeight(25),
-      getRegionalEquipmentWeight(28),
-      getRegionalEquipmentWeight(29),
-      getRegionalEquipmentWeight(32),
-      getRegionalEquipmentWeight(33),
-      getRegionalEquipmentWeight(36),
-    ]).toEqual([0.8, 0.35, 0.35, 0.6, 0.6, 0.8, 0.8]);
+  it("targets equipment slots by each four-stage band", () => {
+    expect(new Set(getStageEquipmentDropPool(25).map((item) => item.slot))).toEqual(new Set(["main_weapon"]));
+    expect(new Set(getStageEquipmentDropPool(28).map((item) => item.slot))).toEqual(new Set(["main_weapon", "off_hand"]));
+    expect(new Set(getStageEquipmentDropPool(29).map((item) => item.slot))).toEqual(new Set(["armor"]));
+    expect(new Set(getStageEquipmentDropPool(32).map((item) => item.slot))).toEqual(new Set(["armor", "gloves"]));
+    expect(new Set(getStageEquipmentDropPool(33).map((item) => item.slot))).toEqual(new Set(["ring"]));
+    expect(new Set(getStageEquipmentDropPool(35).map((item) => item.slot))).toEqual(new Set(["amulet", "earring"]));
+    expect(new Set(getStageEquipmentDropPool(36).map((item) => item.slot)).size).toBe(10);
   });
 
-  it("selects Red Sands or earlier gear around each chapter-three threshold", () => {
-    expect(selectEquipmentDefinition(25, new FixedRandom(0.34)).chapter).toBe(3);
-    expect(selectEquipmentDefinition(25, new FixedRandom(0.35)).chapter).not.toBe(3);
-    expect(selectEquipmentDefinition(29, new FixedRandom(0.59)).chapter).toBe(3);
-    expect(selectEquipmentDefinition(29, new FixedRandom(0.6)).chapter).not.toBe(3);
-    expect(selectEquipmentDefinition(33, new FixedRandom(0.79)).chapter).toBe(3);
-    expect(selectEquipmentDefinition(33, new FixedRandom(0.8)).chapter).not.toBe(3);
+  it("maps a natural equipment name to one chapter only", () => {
+    expect(getEquipmentDropChapters(ITEM_BY_ID.weapon_guard_blade!)).toEqual([1]);
+    expect(getEquipmentDropChapters(ITEM_BY_ID.main_weapon_ch7_p!)).toEqual([7]);
+    expect(getEquipmentDropChapters(ITEM_BY_ID.set_moss_crown_main_weapon!)).toEqual([]);
   });
 
-  it("repeats the approved regional thresholds in Stormsea", () => {
-    expect([
-      getRegionalEquipmentWeight(36),
-      getRegionalEquipmentWeight(37),
-      getRegionalEquipmentWeight(40),
-      getRegionalEquipmentWeight(41),
-      getRegionalEquipmentWeight(44),
-      getRegionalEquipmentWeight(45),
-      getRegionalEquipmentWeight(48),
-    ]).toEqual([0.8, 0.35, 0.35, 0.6, 0.6, 0.8, 0.8]);
-  });
-
-  it("selects Stormsea or earlier gear around each chapter-four threshold", () => {
-    expect(selectEquipmentDefinition(37, new FixedRandom(0.34)).chapter).toBe(4);
-    expect(selectEquipmentDefinition(37, new FixedRandom(0.35)).chapter).not.toBe(4);
-    expect(selectEquipmentDefinition(41, new FixedRandom(0.59)).chapter).toBe(4);
-    expect(selectEquipmentDefinition(41, new FixedRandom(0.6)).chapter).not.toBe(4);
-    expect(selectEquipmentDefinition(45, new FixedRandom(0.79)).chapter).toBe(4);
-    expect(selectEquipmentDefinition(45, new FixedRandom(0.8)).chapter).not.toBe(4);
+  it("keeps only the current chapter at every campaign boundary", () => {
+    expect(new Set(getStageEquipmentDropPool(48).map((item) => item.chapter))).toEqual(new Set([4]));
+    expect(new Set(getStageEquipmentDropPool(84).map((item) => item.chapter))).toEqual(new Set([7]));
+    expect(new Set(getStageEquipmentDropPool(120).map((item) => item.chapter))).toEqual(new Set([10]));
   });
 });

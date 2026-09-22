@@ -2,6 +2,7 @@
 
 > **状态：** 已确认，进入生产  
 > **日期：** 2026-07-31  
+> **现行修订：** 2026-09-15，统一英雄本体标尺
 > **范围：** 13 个职业、40 个专精、男女各一张，共 80 张完整角色单图  
 > **权威风格参考：** [`hero-style-master-v1.png`](../../art/references/hero-style-master-v1.png)
 
@@ -39,11 +40,20 @@
 - 正方形单角色资产，角色完整入画。
 - 角色朝右，采用三分之四侧身；脸部仍能看到两只眼睛。
 - 姿势为可直接进入战斗的中性待机姿势，不使用大幅挥砍、跳跃或施法动作。
-- 角色占画布高度 `72%–80%`，脚底位于统一基线。
+- 角色本体使用统一标尺，脚底位于统一基线；武器、盾牌和独立法术符号只占用本体框以外的装备空间。
 - 四周留有安全边距，武器、头发、耳朵、角和法杖不得触边。
 - 不出现地面、投影、场景、边框、标题、属性条、宠物或第二名角色。
 
-### 3.2 Q 版比例
+### 3.2 统一本体标尺
+
+- “角色本体”由头部外轮廓、脸部、核心躯干、圆形双手、短腿和双脚确定；手持武器、盾牌、法杖、弓、外扩肩甲、披风飘片、光环和独立法术符号不参与本体尺寸计算。
+- 所有英雄使用同一个 `1024×1024` 坐标系：本体框高度固定为 `760 px`，水平中心为 `x=512`，脚底基线为 `y=930`。
+- 本体头部宽度保持为本体高度的 `58%–62%`，核心躯干宽度保持为 `44%–48%`，圆手直径保持为 `13%–16%`；职业和性别不能通过缩小这些基础尺寸表达。
+- 护甲、长发、兜帽和长袍可以改变外轮廓，但必须围绕同一头部、躯干、手脚锚点向外生长。重甲英雄不能拥有更大的基础身体，布甲英雄也不能拥有更小的基础身体。
+- 完整角色四周保留至少 `32 px` 安全边距。装备超出安全区时，缩短装备、收紧姿势或重新生成整名角色，禁止缩小本体以把装备塞进画布。
+- 母版处理以人工确认的本体框计算统一缩放，并以本体框而非整张图的 Alpha 可见边界居中。所有英雄在运行时使用同一个显示倍率，不允许按单张素材的可见边界二次放大或缩小。
+
+### 3.3 Q 版比例
 
 - 总体为 `1.45–1.65` 头身。
 - 包含头发或帽子的头部占角色总高 `58%–64%`。
@@ -53,25 +63,26 @@
 - 双腿简化为两个短小色块，脚尖轻微错开以表达侧身。
 - 双手均为清晰圆形，不绘制手指。
 
-### 3.3 五官
+### 3.4 五官
 
 - 两只竖向黑色椭圆眼睛。
 - 不绘制嘴巴、鼻子、眉毛、睫毛和面部皱纹。
 - 眼睛大小、间距和高度必须接近权威参考。
 - 不使用表情符号、腮红或高光眼珠。
 
-### 3.4 线条与色块
+### 3.5 线条与色块
 
 - 轮廓线使用近黑色，不使用纯灰描边。
 - 外轮廓线宽约为头部宽度的 `9%–12%`。
 - 内部分隔线宽为外轮廓的 `45%–60%`。
+- 描边粗细以 `430×280` 战斗画布中的最终显示结果验收；同屏英雄的外轮廓不得因装备尺寸或单图缩放出现明显粗细跳变。
 - 所有线条使用圆角端点与圆角连接。
 - 每名角色只使用 `4–6` 个主要可见颜色，不含描边色。
 - 使用大面积纯色色块；只允许一层非常轻微的同色系暗面辅助体积。
 - 禁止写实材质、金属反射、复杂渐变、颗粒、笔刷纹理、强光晕和 3D 渲染感。
 - 内部主要分隔线不超过 8 条，装饰不得把身体切碎。
 
-### 3.5 武器与职业辨识
+### 3.6 武器与职业辨识
 
 辨识优先级为：
 
@@ -86,9 +97,20 @@
 - 匕首、短剑、单手锤：角色总高 `42%–56%`。
 - 法杖、长弓、长柄武器、双手武器：角色总高 `55%–68%`。
 - 盾牌：角色总高 `30%–40%`。
-- 双持武器不得遮挡整个身体，轮廓应一前一后自然错开。
+- 双持武器不得遮挡整个身体，轮廓应一前一后自然错开，但两件攻击武器的工作端都必须朝画面右侧。
 - 武器最多保留三个结构层级：主体、握柄、一个识别装饰。
 - 不使用超大刀刃、密集齿口、复杂镶嵌或超过头部尺寸的法术特效。
+
+### 3.7 装备持握与朝向
+
+- 英雄统一面向画面右侧，右侧为默认交战方向。战斗待机中的刀剑从握柄向右或右上出刃，剑尖的 `x` 坐标必须大于握柄的 `x` 坐标；旧版 H01 那种从手部向左上伸出的剑判定为方向错误。只有明确收刀入鞘的非战斗姿势可以例外。
+- 装备朝向验收从肩部开始：肩、肘、腕、圆手和握柄必须形成连续、自然的受力链。武器指向人物前方时，持械上臂不得后摆到躯干后方；标准姿势为手臂自然下垂或略向前、肘部低于肩部、手腕与握柄方向一致。
+- H01 防护战士固定为人物左手持剑、人物右手持盾；在右向三分之四视角中，剑位于画面右侧，盾位于画面左侧。剑臂自然下垂并略向前，盾臂弯曲护住躯干。
+- 圆手只能握在握柄、弓把或盾牌背带位置。刀剑护手必须位于手与刃之间；斧头、战锤和法杖头必须位于握持点外侧；不得握住刃面、斧头、锤头、法杖顶饰或盾缘。
+- 弓手握住弓把，弓背朝交战方向、弓弦位于人物一侧；出现箭矢时，箭头必须朝右。弓身与弓弦不能因镜像而交换前后关系。
+- 所有“盾牌＋攻击武器”角色统一为人物左手（画面右侧）持攻击武器、人物右手（画面左侧）持盾。盾牌正面朝右前方，持握结构隐藏在盾面背后；盾牌不能像贴在手背外侧的装饰片。
+- 双持武器的两个握柄分别进入两只圆手。两件攻击武器都必须朝画面右侧或右上方：刀剑或爪尖、斧锤工作端中心、枪口的横坐标都必须大于各自握持圆手的横坐标。前后手允许姿势不同，但不得左右对称外展，也不能让其中一件出现反握、倒握或穿过手掌。
+- 装备方向失败时重新生成或只编辑该装备及持握关系。不得通过翻转整名角色修复，因为这会同时破坏英雄的统一朝向。
 
 ## 4. 男女角色的配对规则
 
@@ -189,10 +211,11 @@ Asset type: H5 idle RPG complete single-character hero master
 Input image: Image 1 is the sole authoritative style reference. Use only its simplified visual language, proportions, line weight, eyes, hands, feet, flat color treatment, and restrained weapon scale. Do not copy any depicted character.
 Primary request: Generate exactly one complete original <性别><种族><职业><专精> hero from scratch as one coherent illustration.
 Subject: <本行武器、轮廓、头部识别点、身体识别点、专精符号与配色>
-Composition: right-facing three-quarter side view, both oval eyes visible, neutral combat-ready idle pose, full body, centered, feet on one baseline, 72–80% canvas height, generous padding.
-Style: ultra-simple cute fantasy cartoon, 1.45–1.65 heads tall, huge round face, hidden neck, tiny torso, two circle hands, two extremely short legs, very thick rounded near-black outline, minimal inner lines, 4–6 flat colors.
+Composition: right-facing three-quarter side view, both oval eyes visible, neutral combat-ready idle pose, full body. Keep the body anchors—outer head, core torso, circle hands, short legs and feet—at one shared scale: exactly 74% canvas height, horizontally centered, feet on one baseline. Weapons, shields and detached magic symbols may extend beyond the body frame while keeping generous outer padding.
+Style: ultra-simple cute fantasy cartoon, 1.45–1.65 heads tall, huge round face, hidden neck, tiny torso, two circle hands, two extremely short legs, very thick rounded near-black outline at the same visual weight as the reference, minimal inner lines, 4–6 flat colors.
+Equipment mechanics: the hero faces right and the right side is the combat direction. Validate the full limb chain before the weapon direction: shoulder, elbow, wrist, round hand and grip must form one natural continuous load path. A forward-pointing weapon arm must hang naturally or reach slightly forward with the elbow below the shoulder; never pull the upper arm behind the torso while twisting the weapon forward. Every ready-position attack weapon must extend right or upper-right from its own grip. In a dual-wield loadout, both weapons point in that same screen-right combat direction: both blade or claw tips, axe or hammer working-head centers, and firearm muzzles must have an x-coordinate greater than their own gripping hands. Never mirror a dual-wield pair outward. In every weapon-and-shield loadout, the anatomical left hand on screen-right carries the attack weapon and the anatomical right hand on screen-left carries the shield. Put each round hand on a real grip; keep guards between hand and blade, weapon heads beyond the hand, shield face braced toward front-right, and bow string on the character side with any arrowhead pointing right. No mirrored, backward, upside-down, reverse-gripped or hand-piercing equipment.
 Scene/backdrop: perfectly flat solid #ff00ff chroma-key background for later removal.
-Constraints: exactly one character; one cohesive body; complete weapon; no mouth, nose, eyebrows, eyelashes, fingers, text, logo, watermark, UI, frame, ground, cast shadow, glow cloud, pet, companion, second character, character sheet, turnaround, callout, panels, separate equipment, spare parts, collage, modular pieces, template or sprite sheet.
+Constraints: exactly one character; one cohesive body; complete weapon; keep the same head width, core torso width, hand diameter and foot size regardless of equipment complexity; never shrink the body to make a weapon, shield, armor, cape or halo fit—simplify or reposition the equipment instead; no mouth, nose, eyebrows, eyelashes, fingers, text, logo, watermark, UI, frame, ground, cast shadow, glow cloud, pet, companion, second character, character sheet, turnaround, callout, panels, separate equipment, spare parts, collage, modular pieces, template or sprite sheet.
 Avoid: front-facing pose, realistic anatomy, long legs, small head, sharp chin, thin lines, painterly rendering, glossy 3D, complex armor filigree, oversized weapon, copied game armor, copied artifact weapon, faction insignia. Do not use #ff00ff in the character.
 ```
 
@@ -245,7 +268,8 @@ hero_pa_pro_f_master_v01.png
 - 尺寸为 `1024 × 1024`。
 - 四角完全透明。
 - 非透明主体没有触碰画布边缘。
-- 主体高度占画布 `68%–84%`；超过范围视为构图异常。
+- PNG 元数据中的 `hero_body_bbox` 必须记录本体框，框高为 `760 px`、水平中心为 `x=512`、底边为 `y=930`。
+- 完整可见轮廓四周安全边距不低于 `32 px`；装备超限时退回重做，不得缩小本体。
 - 文件名与 80 项清单完全匹配，不缺失、不重复。
 - 512 WebP、256 头像和 96 px 预览均可正常解码。
 
@@ -256,10 +280,13 @@ hero_pa_pro_f_master_v01.png
 - [ ] 只有一名完整角色，没有角色板、配件板或额外角色。
 - [ ] 朝右三分之四侧身，不是正面立绘。
 - [ ] 头部足够圆且足够大，腿部极短。
+- [ ] 本体高度、头宽、核心躯干宽、圆手直径和脚部大小与同屏英雄一致；装备复杂度没有改变本体比例。
 - [ ] 两只椭圆眼睛清晰，没有嘴、鼻、眉毛和睫毛。
 - [ ] 两只手均为圆形，没有手指。
 - [ ] 外轮廓粗、圆、连续，不出现细碎线条。
+- [ ] 在实际战斗显示尺寸下，描边粗细与统一英雄锚点一致。
 - [ ] 武器完整、克制且能辨识，不遮挡脸部和主要身体。
+- [ ] 装备与人物朝向一致；双持攻击武器的两个工作端都朝画面右侧；盾武角色由人物左手（画面右侧）持武器、人物右手（画面左侧）持盾；圆手握在正确位置，工作端和刃口没有拿反、倒置、穿手或镜像错误。
 - [ ] 专精通过武器、主色和一个符号被识别。
 - [ ] 与权威参考在极简程度、Q 版比例和线条粗度上相符。
 - [ ] 不包含第三方套装、武器、纹章或角色的可识别复制。

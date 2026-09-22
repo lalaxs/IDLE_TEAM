@@ -18,7 +18,8 @@ export class DebugOverlay {
         <button data-debug="enemies" aria-label="清除敌人">清除敌人</button>
         <button data-debug="heroes" aria-label="击倒全队">击倒全队</button>
         <button data-debug="gold">+1000 金币</button>
-        <button data-debug="gems">+500 宝石</button>
+        <button data-debug="gems">+500 星石</button>
+        <button class="debug-wide" data-debug="loot-chests" aria-label="获得木、铜、银、金宝箱各一个">四档宝箱各 +1</button>
       </div>
     `;
     this.stats = this.element.querySelector("pre")!;
@@ -29,13 +30,12 @@ export class DebugOverlay {
       if (action === "toggle") this.element.classList.toggle("collapsed");
       if (action === "enemies") this.session.debugDefeatEnemies();
       if (action === "heroes") this.session.debugDefeatHeroes();
+      if (action === "loot-chests") this.session.debugGrantAllEquipmentChests();
       if (action === "gold") {
-        this.session.store.getState().save.gold += 1000;
-        this.session.store.dispatch({ type: "settings:update", patch: {} });
+        this.session.store.dispatch({ type: "debug:addCurrency", gold: 1000 });
       }
       if (action === "gems") {
-        this.session.store.getState().save.gems += 500;
-        this.session.store.dispatch({ type: "settings:update", patch: {} });
+        this.session.store.dispatch({ type: "debug:addCurrency", gems: 500 });
       }
     });
     root.append(this.element);
@@ -58,5 +58,9 @@ export class DebugOverlay {
       `状态 ${snapshot.state}`,
       `英雄 ${aliveHeroes} · 敌人 ${aliveEnemies}`,
     ].join("\n");
+  }
+
+  destroy(): void {
+    this.element.remove();
   }
 }

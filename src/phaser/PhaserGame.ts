@@ -5,9 +5,10 @@ import type { BattleEvent, BattleSnapshot } from "../simulation/types";
 export class PhaserGame {
   private readonly scene: BattleScene;
   private readonly game: Phaser.Game;
+  private destroyed = false;
 
-  constructor(parentId: string) {
-    this.scene = new BattleScene();
+  constructor(parentId: string, initialSnapshot: BattleSnapshot) {
+    this.scene = new BattleScene(initialSnapshot);
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: parentId,
@@ -37,11 +38,17 @@ export class PhaserGame {
     this.scene.publish(snapshot, events, reducedMotion);
   }
 
+  prepare(snapshot: BattleSnapshot): boolean {
+    return this.scene.prepare(snapshot);
+  }
+
   resetViews(): void {
     this.scene.resetViews();
   }
 
   destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
     this.game.destroy(true);
   }
 }

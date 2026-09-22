@@ -14,12 +14,12 @@ const target = path.join(
 );
 await mkdir(path.dirname(target), { recursive: true });
 const heroes = [
-  ["H01", "洛恩", "hero-h01.svg"],
-  ["H03", "米娅", "hero-h03.svg"],
-  ["H04", "诺拉", "hero-h04.svg"],
-  ["H05", "塔林", "hero-h05.svg"],
-  ["H06", "乌鸦", "hero-h06.svg"],
-  ["H08", "海泽", "hero-h08.svg"],
+  ["H01", "洛恩", "hero-h01.webp"],
+  ["H03", "米娅", "hero-h03.webp"],
+  ["H04", "诺拉", "hero-h04.webp"],
+  ["H05", "塔林", "hero-h05.webp"],
+  ["H06", "乌鸦", "hero-h06.webp"],
+  ["H08", "海泽", "hero-h08.webp"],
 ];
 
 const width = 960;
